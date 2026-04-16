@@ -1,1 +1,2 @@
-# BazaarHub---Shopping-Store
+# BazaarHub-ShoppingStore
+DataBase Management Systems(DBMS)
