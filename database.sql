@@ -1,3 +1,26 @@
+<<<<<<< Updated upstream
+=======
+/* =========================================================
+   BAZARHUB DATABASE SCHEMA
+   Course: Database Systems
+   Stack: PHP + MySQL
+   ========================================================= */
+SET FOREIGN_KEY_CHECKS = 0;
+
+DROP TABLE IF EXISTS payments, reviews, order_items, orders, cart, products, categories, users;
+
+SET FOREIGN_KEY_CHECKS = 1;
+/* =========================================================
+   BAZARHUB DATABASE SCHEMA
+   Course: Database Systems
+   Stack: PHP + MySQL
+   ========================================================= */
+
+
+/* =========================================================
+   1. USERS TABLE
+   ========================================================= */
+>>>>>>> Stashed changes
 CREATE TABLE users (
     id INT AUTO_INCREMENT PRIMARY KEY,
     name VARCHAR(100),
