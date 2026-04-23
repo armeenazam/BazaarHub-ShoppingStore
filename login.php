@@ -1,5 +1,71 @@
+<?php
+// IMPORTANT: PHP MUST BE AT THE VERY TOP - NO SPACES OR CHARACTERS BEFORE <?php
+session_start();
+include "db.php";
+$message = "";
+
+if ($_SERVER["REQUEST_METHOD"] == "POST") {
+    $email = trim($_POST['email']);
+    $password = $_POST['password'];
+    
+    // FIXED: Use prepared statement + fetch ALL needed fields
+    $stmt = $conn->prepare("SELECT id, name, role, password FROM users WHERE email = ? LIMIT 1");
+    $stmt->bind_param("s", $email);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    
+    if ($user = $result->fetch_assoc()) {
+        // FIXED: Use password_verify (update your DB passwords with password_hash)
+        if (password_verify($password, $user['password']) || $password === $user['password']) {
+            // Set ALL session variables your dashboards need
+            $_SESSION['user_id'] = $user['id'];
+            $_SESSION['name'] = $user['name'];  // ← THIS WAS MISSING!
+            $_SESSION['role'] = $user['role'];
+            $_SESSION['email'] = $email;
+            
+            session_regenerate_id(true);
+            
+            $target = $redirects[$user['role']] ?? 'customer/dashboard.php';
+
+            // ✅ NEW CODE (FORCE REDIRECT)
+            $role = $user['role'];
+            if ($role == 'admin') {
+                header("Location: admin/dashboard.php");
+            } elseif ($role == 'seller') {
+                header("Location: seller/dashboard.php");
+            } else {
+                header("Location: customer/dashboard.php");  // Always go here for customer
+            }
+            exit();
+            
+            $target = $redirects[$user['role']] ?? 'customer/dashboard.php';
+            
+            if (file_exists($target)) {
+                header("Location: $target");
+                exit();
+            } else {
+                $message = "Dashboard file not found: $target";
+            }
+        } else {
+            $message = "❌ Invalid password";
+        }
+    } else {
+        $message = "❌ No user found with that email";
+    }
+    $stmt->close();
+}
+?>
+
 <?php $page_title = "BazaarHub Auth"; ?>
 <!DOCTYPE html>
+<!-- Your existing HTML -->
+<!-- Add this in your form for error display -->
+<?php if ($message): ?>
+    <script>
+        alert('<?php echo $message; ?>');
+    </script>
+<?php endif; ?>
+
 <html lang="en">
 
 <head>
@@ -64,7 +130,7 @@
 
                         <div class="divider"><span>or use your email for registration</span></div>
 
-                        <form class="auth-form" data-mock-form="signin" novalidate>
+                        <form class="auth-form" method="POST" action="login.php" novalidate>
                             <div class="field">
 
                                 <div class="field__control">
