@@ -1,71 +1,5 @@
-<?php
-// IMPORTANT: PHP MUST BE AT THE VERY TOP - NO SPACES OR CHARACTERS BEFORE <?php
-session_start();
-include "db.php";
-$message = "";
-
-if ($_SERVER["REQUEST_METHOD"] == "POST") {
-    $email = trim($_POST['email']);
-    $password = $_POST['password'];
-    
-    // FIXED: Use prepared statement + fetch ALL needed fields
-    $stmt = $conn->prepare("SELECT id, name, role, password FROM users WHERE email = ? LIMIT 1");
-    $stmt->bind_param("s", $email);
-    $stmt->execute();
-    $result = $stmt->get_result();
-    
-    if ($user = $result->fetch_assoc()) {
-        // FIXED: Use password_verify (update your DB passwords with password_hash)
-        if (password_verify($password, $user['password']) || $password === $user['password']) {
-            // Set ALL session variables your dashboards need
-            $_SESSION['user_id'] = $user['id'];
-            $_SESSION['name'] = $user['name'];  // ← THIS WAS MISSING!
-            $_SESSION['role'] = $user['role'];
-            $_SESSION['email'] = $email;
-            
-            session_regenerate_id(true);
-            
-            $target = $redirects[$user['role']] ?? 'customer/dashboard.php';
-
-            // ✅ NEW CODE (FORCE REDIRECT)
-            $role = $user['role'];
-            if ($role == 'admin') {
-                header("Location: admin/dashboard.php");
-            } elseif ($role == 'seller') {
-                header("Location: seller/dashboard.php");
-            } else {
-                header("Location: customer/dashboard.php");  // Always go here for customer
-            }
-            exit();
-            
-            $target = $redirects[$user['role']] ?? 'customer/dashboard.php';
-            
-            if (file_exists($target)) {
-                header("Location: $target");
-                exit();
-            } else {
-                $message = "Dashboard file not found: $target";
-            }
-        } else {
-            $message = "❌ Invalid password";
-        }
-    } else {
-        $message = "❌ No user found with that email";
-    }
-    $stmt->close();
-}
-?>
-
-<?php $page_title = "BazaarHub Auth"; ?>
+<?php $page_title = "BazaarHub - Sign In"; ?>
 <!DOCTYPE html>
-<!-- Your existing HTML -->
-<!-- Add this in your form for error display -->
-<?php if ($message): ?>
-    <script>
-        alert('<?php echo $message; ?>');
-    </script>
-<?php endif; ?>
-
 <html lang="en">
 
 <head>
@@ -74,189 +8,226 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     <title><?php echo $page_title; ?></title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="assets/css/styles.css">
     <link rel="stylesheet" href="assets/css/auth.css">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" />
 </head>
 
 <body class="auth-page">
+    <div class="bg-pattern" aria-hidden="true"></div>
     <div class="page-glow page-glow--top" aria-hidden="true"></div>
     <div class="page-glow page-glow--bottom" aria-hidden="true"></div>
 
-    <header class="site-header">
-        <div class="site-header__inner">
-            <a class="wordmark" href="login.php" aria-label="BazaarHub home">
-                <span>Bazaar</span><span class="wordmark__accent">Hub</span>
-            </a>
-
-        </div>
-    </header>
-
     <main class="auth-main">
-        <section class="auth-card" data-auth-shell data-mode="signin" aria-label="Sign in or create account">
-            <div class="auth-card__mobile-head">
-                <p class="eyebrow">Marketplace Access</p>
-
-                <p class="muted-copy">Join BazaarHub to discover artisans, manage your shop, and keep every order in motion.</p>
-            </div>
-
-            <div class="form-window" aria-live="polite">
-                <div class="form-track">
-                    <section class="form-pane form-pane--signin" data-form-pane="signin" aria-labelledby="signin-heading">
-                        <div class="form-pane__header">
-                            <h2 id="signin-heading">Sign in</h2>
+        <section class="auth-card" data-auth-shell data-mode="signin" aria-label="BazaarHub authentication">
+            <aside class="brand-panel">
+                <div class="brand-content">
+                    <div class="brand-header">
+                        <h1 class="brand-logo">bazaarhub</h1>
+                        <p class="brand-tagline">Style. Choice. Connection.</p>
+                        <div class="tagline-icon">
+                            <div class="line"></div>
+                            <span class="material-symbols-outlined">spa</span>
+                            <div class="line"></div>
                         </div>
+                    </div>
 
-                        <div class="social-row" aria-label="Sign in with social providers">
-                            <button class="icon-button" type="button" data-social="Facebook" aria-label="Continue with Facebook">
-                                <svg viewBox="0 0 24 24" aria-hidden="true">
-                                    <path d="M13.5 21v-7h2.4l.4-3h-2.8V9.1c0-.9.2-1.6 1.5-1.6h1.4V4.8c-.2 0-1-.1-2-.1-2 0-3.4 1.2-3.4 3.6V11H8v3h3.1v7h2.4z" />
-                                </svg>
-                            </button>
-                            <button class="icon-button" type="button" data-social="Google" aria-label="Continue with Google">
-                                <svg viewBox="0 0 24 24" aria-hidden="true">
-                                    <path d="M21.8 12.2c0-.6-.1-1.1-.2-1.6H12v3h5.5c-.2 1.3-.9 2.4-2 3.1v2.5h3.2c1.9-1.8 3.1-4.4 3.1-7.5z" />
-                                    <path d="M12 22c2.7 0 5-.9 6.7-2.5l-3.2-2.5c-.9.6-2.1 1-3.5 1-2.7 0-5-1.8-5.8-4.2H2.9v2.6C4.6 19.8 8 22 12 22z" />
-                                    <path d="M6.2 13.8c-.2-.6-.4-1.2-.4-1.8s.1-1.2.4-1.8V7.6H2.9C2.3 8.9 2 10.4 2 12s.3 3.1.9 4.4l3.3-2.6z" />
-                                    <path d="M12 5.8c1.5 0 2.8.5 3.9 1.5l2.9-2.9C17 2.8 14.7 2 12 2 8 2 4.6 4.2 2.9 7.6l3.3 2.6C7 7.6 9.3 5.8 12 5.8z" />
-                                </svg>
-                            </button>
-                            <button class="icon-button" type="button" data-social="Apple" aria-label="Continue with Apple">
-                                <svg viewBox="0 0 24 24" aria-hidden="true">
-                                    <path d="M16.8 12.7c0-2.2 1.8-3.2 1.9-3.3-1-1.5-2.7-1.7-3.3-1.7-1.4-.1-2.8.8-3.5.8-.7 0-1.8-.8-3-.8-1.6 0-3 .9-3.8 2.2-1.6 2.7-.4 6.8 1.1 8.9.8 1 1.7 2 2.9 1.9 1.2-.1 1.6-.7 3-.7 1.4 0 1.8.7 3 .7 1.3 0 2.1-1 2.8-2 .9-1.2 1.3-2.4 1.3-2.5-.1 0-2.4-.9-2.4-3.5zm-2.3-6.5c.6-.7 1-1.7.9-2.7-.9 0-1.9.6-2.5 1.3-.6.7-1.1 1.7-1 2.6 1 .1 2-.5 2.6-1.2z" />
-                                </svg>
-                            </button>
+                    <div class="brand-description">
+                        <div class="features">
+                            <div class="feature">
+                                <span class="material-symbols-outlined">apparel</span>
+                                <p>Discover unique styles</p>
+                            </div>
+                            <div class="feature">
+                                <span class="material-symbols-outlined">shopping_bag</span>
+                                <p>Shop from multiple sellers</p>
+                            </div>
+                            <div class="feature">
+                                <span class="material-symbols-outlined">shield_lock</span>
+                                <p>Safe & secure shopping</p>
+                            </div>
                         </div>
+                    </div>
+                </div>
+            </aside>
 
-                        <div class="divider"><span>or use your email for registration</span></div>
+            <section class="auth-card-shell">
+                <div class="auth-card-inner">
+                    <div class="auth-tabs" role="tablist" aria-label="Authentication tabs">
+                        <button class="auth-tab is-active" id="signin-tab" type="button" role="tab" aria-selected="true" data-tab-target="signin">Sign In</button>
+                        <button class="auth-tab" id="signup-tab" type="button" role="tab" aria-selected="false" data-tab-target="signup">Sign Up</button>
+                    </div>
 
-                        <form class="auth-form" method="POST" action="login.php" novalidate>
+                    <div class="auth-panel is-active" data-panel="signin" role="tabpanel" aria-labelledby="signin-tab">
+                        <form class="auth-form" data-mock-form="signin" novalidate>
                             <div class="field">
-
                                 <div class="field__control">
-                                    <span class="field__icon" aria-hidden="true">
-                                        <svg viewBox="0 0 24 24">
-                                            <path d="M4 6h16a2 2 0 0 1 2 2v.4l-10 5.6L2 8.4V8a2 2 0 0 1 2-2zm18 4.7V16a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-5.3l9.5 5.3a1 1 0 0 0 1 0L22 10.7z" />
-                                        </svg>
-                                    </span>
-                                    <input id="signin-email" name="email" type="email" placeholder="Email Address" required>
+                                    <span class="material-symbols-outlined field__icon">mail</span>
+                                    <input id="signin-email" name="email" type="email" placeholder="Email address" required>
                                 </div>
                             </div>
 
                             <div class="field">
                                 <div class="field__control field__control--password">
-                                    <span class="field__icon" aria-hidden="true">
-                                        <svg viewBox="0 0 24 24">
-                                            <path d="M17 9h-1V7a4 4 0 1 0-8 0v2H7a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-7a2 2 0 0 0-2-2zm-6 6.7V17a1 1 0 1 0 2 0v-1.3a2 2 0 1 0-2 0zM10 9V7a2 2 0 1 1 4 0v2h-4z" />
-                                        </svg>
-                                    </span>
+                                    <span class="material-symbols-outlined field__icon">lock</span>
                                     <input id="signin-password" name="password" type="password" placeholder="Password" required>
-                                    <button class="password-toggle" type="button" data-password-toggle aria-label="Show password">Show</button>
+                                    <button class="password-toggle" type="button" data-password-toggle aria-label="Show password">
+                                        <svg class="eye-open" viewBox="0 0 24 24">
+                                            <path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z" />
+                                        </svg>
+                                        <svg class="eye-closed" viewBox="0 0 24 24">
+                                            <path d="M12 7c2.76 0 5 2.24 5 5 0 .65-.13 1.26-.36 1.83l2.92 2.92c1.51-1.26 2.7-2.89 3.43-4.75-1.73-4.39-6-7.5-11-7.5-1.4 0-2.74.25-3.98.7l2.16 2.16C10.74 7.13 11.35 7 12 7zM2 4.27l2.28 2.28.46.46C3.08 8.3 1.78 10.02 1 12c1.73 4.39 6 7.5 11 7.5 1.55 0 3.03-.3 4.38-.84l.42.42L19.73 22 21 20.73 3.27 3 2 4.27zM7.53 9.8l1.55 1.55c-.05.21-.08.43-.08.65 0 1.66 1.34 3 3 3 .22 0 .44-.03.65-.08l1.55 1.55c-.67.33-1.41.53-2.2.53-2.76 0-5-2.24-5-5 0-.79.2-1.53.53-2.2zm4.31-.78l3.15 3.15.02-.16c0-1.66-1.34-3-3-3l-.17.01z" />
+                                        </svg>
+                                    </button>
                                 </div>
                             </div>
 
                             <div class="form-row">
                                 <label class="checkbox">
                                     <input type="checkbox" name="remember_me">
+                                    <span class="checkbox-mark"></span>
                                     <span>Remember me</span>
                                 </label>
-                                <a class="text-link" href="forgot-password.php">Forgot your password?</a>
+                                <a class="text-link" href="forgot-password.php">Forgot password?</a>
                             </div>
 
                             <button class="submit-button" type="submit" data-loading-text="Signing In">Sign In</button>
+                            <div class="divider-row">
+                                <div class="divider"></div>
+                                <span>or</span>
+                                <div class="divider"></div>
+                            </div>
+                            <button class="google-button" type="button" data-social="Google" aria-label="Continue with Google">
+                                <svg viewBox="0 0 24 24" aria-hidden="true">
+                                    <path fill="#EA4335" d="M12 10.2v3.8h5.4c-.2 1.2-.9 2.3-1.9 3l3 2.4c1.7-1.6 2.7-4 2.7-6.8 0-.7-.1-1.3-.2-1.9H12z" />
+                                    <path fill="#34A853" d="M6.5 14.3l-.7.5-2.6 2c1.7 3.4 5.2 5.7 9.1 5.7 2.7 0 5-.9 6.7-2.4l-3.2-2.5c-.9.6-2.1 1-3.5 1-2.7 0-5-1.8-5.8-4.3z" />
+                                    <path fill="#FBBC05" d="M3.2 8.1c-.7 1.4-1.1 3-1.1 4.7s.4 3.3 1.1 4.7l3.3-2.6c-.2-.7-.3-1.3-.3-2.1s.1-1.5.3-2.1L3.2 8.1z" />
+                                    <path fill="#4285F4" d="M12 5.3c1.5 0 2.8.5 3.8 1.4l2.9-2.9C17.1 2.2 14.8 1.3 12 1.3 8.1 1.3 4.6 3.6 3 7l3.3 2.6c.8-2.5 3.1-4.3 5.7-4.3z" />
+                                </svg>
+                                <span>Continue with Google</span>
+                            </button>
                         </form>
-                    </section>
+                    </div>
 
-                    <section class="form-pane form-pane--signup" data-form-pane="signup" aria-labelledby="signup-heading">
-                        <div class="form-pane__header">
-                            <h2 id="signup-heading">Create Account</h2>
-                        </div>
-
-                        <div class="social-row" aria-label="Create account with social providers">
-                            <button class="icon-button" type="button" data-social="Facebook" aria-label="Continue with Facebook">
-                                <svg viewBox="0 0 24 24" aria-hidden="true">
-                                    <path d="M13.5 21v-7h2.4l.4-3h-2.8V9.1c0-.9.2-1.6 1.5-1.6h1.4V4.8c-.2 0-1-.1-2-.1-2 0-3.4 1.2-3.4 3.6V11H8v3h3.1v7h2.4z" />
-                                </svg>
-                            </button>
-                            <button class="icon-button" type="button" data-social="Google" aria-label="Continue with Google">
-                                <svg viewBox="0 0 24 24" aria-hidden="true">
-                                    <path d="M21.8 12.2c0-.6-.1-1.1-.2-1.6H12v3h5.5c-.2 1.3-.9 2.4-2 3.1v2.5h3.2c1.9-1.8 3.1-4.4 3.1-7.5z" />
-                                    <path d="M12 22c2.7 0 5-.9 6.7-2.5l-3.2-2.5c-.9.6-2.1 1-3.5 1-2.7 0-5-1.8-5.8-4.2H2.9v2.6C4.6 19.8 8 22 12 22z" />
-                                    <path d="M6.2 13.8c-.2-.6-.4-1.2-.4-1.8s.1-1.2.4-1.8V7.6H2.9C2.3 8.9 2 10.4 2 12s.3 3.1.9 4.4l3.3-2.6z" />
-                                    <path d="M12 5.8c1.5 0 2.8.5 3.9 1.5l2.9-2.9C17 2.8 14.7 2 12 2 8 2 4.6 4.2 2.9 7.6l3.3 2.6C7 7.6 9.3 5.8 12 5.8z" />
-                                </svg>
-                            </button>
-                            <button class="icon-button" type="button" data-social="Apple" aria-label="Continue with Apple">
-                                <svg viewBox="0 0 24 24" aria-hidden="true">
-                                    <path d="M16.8 12.7c0-2.2 1.8-3.2 1.9-3.3-1-1.5-2.7-1.7-3.3-1.7-1.4-.1-2.8.8-3.5.8-.7 0-1.8-.8-3-.8-1.6 0-3 .9-3.8 2.2-1.6 2.7-.4 6.8 1.1 8.9.8 1 1.7 2 2.9 1.9 1.2-.1 1.6-.7 3-.7 1.4 0 1.8.7 3 .7 1.3 0 2.1-1 2.8-2 .9-1.2 1.3-2.4 1.3-2.5-.1 0-2.4-.9-2.4-3.5zm-2.3-6.5c.6-.7 1-1.7.9-2.7-.9 0-1.9.6-2.5 1.3-.6.7-1.1 1.7-1 2.6 1 .1 2-.5 2.6-1.2z" />
-                                </svg>
-                            </button>
-                        </div>
-
-                        <div class="divider"><span>or create with email</span></div>
-
+                    <div class="auth-panel" data-panel="signup" role="tabpanel" aria-labelledby="signup-tab" hidden>
                         <form class="auth-form" data-mock-form="signup" novalidate>
-                            <div class="field">
-                                <div class="field__control">
-                                    <span class="field__icon" aria-hidden="true">
-                                        <svg viewBox="0 0 24 24">
-                                            <path d="M12 12a4 4 0 1 0-4-4 4 4 0 0 0 4 4zm0 2c-3.3 0-6 1.8-6 4v1h12v-1c0-2.2-2.7-4-6-4z" />
-                                        </svg>
-                                    </span>
-                                    <input id="signup-name" name="full_name" type="text" placeholder="Full Name" required>
+                            <div class="field-row">
+                                <div class="field">
+                                    <div class="field__control">
+                                        <span class="material-symbols-outlined field__icon">person</span>
+                                        <input id="signup-firstname" name="first_name" type="text" placeholder="First name" required>
+                                    </div>
+                                </div>
+                                <div class="field">
+                                    <div class="field__control">
+                                        <span class="material-symbols-outlined field__icon">person</span>
+                                        <input id="signup-lastname" name="last_name" type="text" placeholder="Last name" required>
+                                    </div>
                                 </div>
                             </div>
 
                             <div class="field">
                                 <div class="field__control">
-                                    <span class="field__icon" aria-hidden="true">
-                                        <svg viewBox="0 0 24 24">
-                                            <path d="M4 6h16a2 2 0 0 1 2 2v.4l-10 5.6L2 8.4V8a2 2 0 0 1 2-2zm18 4.7V16a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-5.3l9.5 5.3a1 1 0 0 0 1 0L22 10.7z" />
-                                        </svg>
-                                    </span>
-                                    <input id="signup-email" name="email" type="email" placeholder="Email Address" required>
+                                    <span class="material-symbols-outlined field__icon">mail</span>
+                                    <input id="signup-email" name="email" type="email" placeholder="Email address" required>
                                 </div>
                             </div>
 
                             <div class="field">
                                 <div class="field__control field__control--password">
-                                    <span class="field__icon" aria-hidden="true">
-                                        <svg viewBox="0 0 24 24">
-                                            <path d="M17 9h-1V7a4 4 0 1 0-8 0v2H7a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-7a2 2 0 0 0-2-2zm-6 6.7V17a1 1 0 1 0 2 0v-1.3a2 2 0 1 0-2 0zM10 9V7a2 2 0 1 1 4 0v2h-4z" />
+                                    <span class="material-symbols-outlined field__icon">lock</span>
+                                    <input id="signup-password" name="password" type="password" placeholder="Create password" required>
+                                    <button class="password-toggle" type="button" data-password-toggle aria-label="Show password">
+                                        <svg class="eye-open" viewBox="0 0 24 24">
+                                            <path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z" />
                                         </svg>
-                                    </span>
-                                    <input id="signup-password" name="password" type="password" placeholder="Password" required>
-                                    <button class="password-toggle" type="button" data-password-toggle aria-label="Show password">Show</button>
+                                        <svg class="eye-closed" viewBox="0 0 24 24">
+                                            <path d="M12 7c2.76 0 5 2.24 5 5 0 .65-.13 1.26-.36 1.83l2.92 2.92c1.51-1.26 2.7-2.89 3.43-4.75-1.73-4.39-6-7.5-11-7.5-1.4 0-2.74.25-3.98.7l2.16 2.16C10.74 7.13 11.35 7 12 7zM2 4.27l2.28 2.28.46.46C3.08 8.3 1.78 10.02 1 12c1.73 4.39 6 7.5 11 7.5 1.55 0 3.03-.3 4.38-.84l.42.42L19.73 22 21 20.73 3.27 3 2 4.27zM7.53 9.8l1.55 1.55c-.05.21-.08.43-.08.65 0 1.66 1.34 3 3 3 .22 0 .44-.03.65-.08l1.55 1.55c-.67.33-1.41.53-2.2.53-2.76 0-5-2.24-5-5 0-.79.2-1.53.53-2.2zm4.31-.78l3.15 3.15.02-.16c0-1.66-1.34-3-3-3l-.17.01z" />
+                                        </svg>
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div class="field">
+                                <div class="field__control field__control--password">
+                                    <span class="material-symbols-outlined field__icon">lock</span>
+                                    <input id="signup-confirm-password" name="confirm_password" type="password" placeholder="Confirm password" required>
+                                    <button class="password-toggle" type="button" data-password-toggle aria-label="Show password">
+                                        <svg class="eye-open" viewBox="0 0 24 24">
+                                            <path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z" />
+                                        </svg>
+                                        <svg class="eye-closed" viewBox="0 0 24 24">
+                                            <path d="M12 7c2.76 0 5 2.24 5 5 0 .65-.13 1.26-.36 1.83l2.92 2.92c1.51-1.26 2.7-2.89 3.43-4.75-1.73-4.39-6-7.5-11-7.5-1.4 0-2.74.25-3.98.7l2.16 2.16C10.74 7.13 11.35 7 12 7zM2 4.27l2.28 2.28.46.46C3.08 8.3 1.78 10.02 1 12c1.73 4.39 6 7.5 11 7.5 1.55 0 3.03-.3 4.38-.84l.42.42L19.73 22 21 20.73 3.27 3 2 4.27zM7.53 9.8l1.55 1.55c-.05.21-.08.43-.08.65 0 1.66 1.34 3 3 3 .22 0 .44-.03.65-.08l1.55 1.55c-.67.33-1.41.53-2.2.53-2.76 0-5-2.24-5-5 0-.79.2-1.53.53-2.2zm4.31-.78l3.15 3.15.02-.16c0-1.66-1.34-3-3-3l-.17.01z" />
+                                        </svg>
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div class="field">
+                                <div class="field__control">
+                                    <span class="material-symbols-outlined field__icon">phone_enabled</span>
+                                    <input id="signup-phone" name="phone" type="tel" placeholder="Phone number">
+                                </div>
+                            </div>
+
+                            <div class="field">
+                                <div class="field__control">
+                                    <span class="material-symbols-outlined field__icon">location_on</span>
+                                    <input id="signup-city" name="city" type="text" placeholder="City">
+                                </div>
+                            </div>
+
+                            <div class="field">
+                                <div class="field__control">
+                                    <span class="material-symbols-outlined field__icon">add_home</span>
+                                    <input id="signup-address" name="address" type="text" placeholder="Address">
+                                </div>
+                            </div>
+
+                            <div class="role-selection">
+                                <p class="role-label">I want to:</p>
+                                <div class="role-options">
+                                    <label class="role-option">
+                                        <input type="radio" name="role" value="buyer" checked>
+                                        <span class="role-card">
+                                            <span class="material-symbols-outlined role-icon">shopping_bag</span>
+                                            <span class="role-text">Register as Buyer</span>
+                                            <span class="role-desc">Shop from multiple trusted sellers</span>
+                                        </span>
+                                    </label>
+                                    <label class="role-option">
+                                        <input type="radio" name="role" value="seller">
+                                        <span class="role-card">
+                                            <span class="material-symbols-outlined role-icon">storefront</span>
+                                            <span class="role-text">Register as Seller</span>
+                                            <span class="role-desc">Sell products to thousands of buyers</span>
+                                        </span>
+                                    </label>
                                 </div>
                             </div>
 
                             <button class="submit-button" type="submit" data-loading-text="Creating Account">Sign Up</button>
+                            <div class="divider-row">
+                                <div class="divider"></div>
+                                <span>or</span>
+                                <div class="divider"></div>
+                            </div>
+                            <button class="google-button" type="button" data-social="Google" aria-label="Continue with Google">
+                                <svg viewBox="0 0 24 24" aria-hidden="true">
+                                    <path fill="#EA4335" d="M12 10.2v3.8h5.4c-.2 1.2-.9 2.3-1.9 3l3 2.4c1.7-1.6 2.7-4 2.7-6.8 0-.7-.1-1.3-.2-1.9H12z" />
+                                    <path fill="#34A853" d="M6.5 14.3l-.7.5-2.6 2c1.7 3.4 5.2 5.7 9.1 5.7 2.7 0 5-.9 6.7-2.4l-3.2-2.5c-.9.6-2.1 1-3.5 1-2.7 0-5-1.8-5.8-4.3z" />
+                                    <path fill="#FBBC05" d="M3.2 8.1c-.7 1.4-1.1 3-1.1 4.7s.4 3.3 1.1 4.7l3.3-2.6c-.2-.7-.3-1.3-.3-2.1s.1-1.5.3-2.1L3.2 8.1z" />
+                                    <path fill="#4285F4" d="M12 5.3c1.5 0 2.8.5 3.8 1.4l2.9-2.9C17.1 2.2 14.8 1.3 12 1.3 8.1 1.3 4.6 3.6 3 7l3.3 2.6c.8-2.5 3.1-4.3 5.7-4.3z" />
+                                </svg>
+                                <span>Continue with Google</span>
+                            </button>
                         </form>
-                    </section>
+                    </div>
                 </div>
-            </div>
-
-            <aside class="overlay-panel" aria-hidden="true">
-                <div class="overlay-copy overlay-copy--signin is-visible">
-                    <h2 id="signin-heading">Hey There!</h2>
-                    <p>Begin your shopping journey by creating an account with us today.</p>
-                    <button class="overlay-button" type="button" data-switch-mode="signup">Sign Up</button>
-                </div>
-                <div class="overlay-copy overlay-copy--signup">
-                    <h2 id="signin-heading">Welcome Back!</h2>
-                    <p>Stay connected by logging in with your credentials and continue your journey at BazaarHub.</p>
-                    <button class="overlay-button" type="button" data-switch-mode="signin">Sign In</button>
-                </div>
-            </aside>
-
-            <div class="mobile-toggle">
-                <button class="mobile-toggle__button" type="button" data-mobile-switch>
-                    <span data-mobile-switch-label>Need an account? Sign Up</span>
-                </button>
-            </div>
+            </section>
         </section>
     </main>
-
 
     <div class="toast-host" aria-live="polite" aria-atomic="true"></div>
     <script src="assets/js/auth.js"></script>
