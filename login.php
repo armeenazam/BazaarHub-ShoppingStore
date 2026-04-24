@@ -1,5 +1,3 @@
-<<<<<<< Updated upstream
-=======
 <?php
 session_start();
 include "db.php";
@@ -318,4 +316,3 @@ $signup_role = $auth_mode === 'signup' ? ($_POST['role'] ?? 'customer') : 'custo
 </body>
 
 </html>
->>>>>>> Stashed changes
