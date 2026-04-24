@@ -7,70 +7,102 @@ $message_type = "";
 $auth_mode = "signin";
 
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
+
+    /* ================= SIGNUP ================= */
     if (isset($_POST['full_name'])) {
+
         $auth_mode = "signup";
-        $full_name = trim($_POST['full_name'] ?? '');
-        $email = trim($_POST['email'] ?? '');
-        $password = $_POST['password'] ?? '';
+
+        $full_name = trim($_POST['full_name']);
+        $email = trim($_POST['email']);
+        $password = $_POST['password'];
         $role = $_POST['role'] ?? 'customer';
+
         $allowed_roles = ['customer', 'seller'];
 
+        // Validation
         if (empty($full_name) || empty($email) || empty($password)) {
             $message = "All fields are required.";
             $message_type = "error";
         } elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
-            $message = "Please enter a valid email address.";
+            $message = "Invalid email.";
             $message_type = "error";
         } elseif (strlen($password) < 6) {
             $message = "Password must be at least 6 characters.";
             $message_type = "error";
-        } elseif (!in_array($role, $allowed_roles, true)) {
-            $message = "Please choose a valid account role.";
+        } elseif (!in_array($role, $allowed_roles)) {
+            $message = "Invalid role.";
             $message_type = "error";
         } else {
-            $check_stmt = $conn->prepare("SELECT id FROM users WHERE email = ?");
-            $check_stmt->bind_param("s", $email);
-            $check_stmt->execute();
 
-            if ($check_stmt->get_result()->num_rows > 0) {
-                $message = "Email already registered.";
+            // Check existing email
+            $check = $conn->prepare("SELECT id FROM users WHERE email = ?");
+            $check->bind_param("s", $email);
+            $check->execute();
+            $result = $check->get_result();
+
+            if ($result->num_rows > 0) {
+                $message = "Email already exists.";
                 $message_type = "error";
             } else {
+
                 $hashed_password = password_hash($password, PASSWORD_DEFAULT);
-                $insert_stmt = $conn->prepare("INSERT INTO users (name, email, password, role, created_at) VALUES (?, ?, ?, ?, NOW())");
-                $insert_stmt->bind_param("ssss", $full_name, $email, $hashed_password, $role);
 
-                if ($insert_stmt->execute()) {
-                    if ($insert_stmt->affected_rows > 0) {
-                        $message = "Account created successfully. Please sign in.";
-                    } else {
-                        $message = "Insert failed (no rows affected).";
-                    }
-                }
-                else {
-                    $message = "Error: " . $insert_stmt->error;
+                $insert = $conn->prepare("
+                    INSERT INTO users (name, email, password, role)
+                    VALUES (?, ?, ?, ?)
+                ");
+
+                $insert->bind_param("ssss", $full_name, $email, $hashed_password, $role);
+
+                if (!$insert->execute()) {
+                    die("SQL ERROR: " . $insert->error);
                 }
 
-                $insert_stmt->close();
+                if ($insert->affected_rows > 0) {
+                    $message = "Account created successfully. Please login.";
+                    $message_type = "success";
+                    $auth_mode = "signin"; // switch UI back
+                } else {
+                    $message = "Insert failed.";
+                    $message_type = "error";
+                }
+
+                $insert->close();
             }
 
-            $check_stmt->close();
+            $check->close();
         }
-    } else {
-        $email = trim($_POST['email'] ?? '');
-        $password = $_POST['password'] ?? '';
 
-        $stmt = $conn->prepare("SELECT id, name, role, password FROM users WHERE email = ? LIMIT 1");
+    }
+
+    /* ================= SIGNIN ================= */
+    else {
+
+        $email = trim($_POST['email']);
+        $password = $_POST['password'];
+
+        $stmt = $conn->prepare("
+            SELECT id, name, role, password
+            FROM users
+            WHERE email = ?
+            LIMIT 1
+        ");
+
         $stmt->bind_param("s", $email);
         $stmt->execute();
         $result = $stmt->get_result();
 
         if ($user = $result->fetch_assoc()) {
-            if (password_verify($password, $user['password']) || $password === $user['password']) {
+
+            // ONLY secure check
+            if (password_verify($password, $user['password'])) {
+
                 $_SESSION['user_id'] = $user['id'];
                 $_SESSION['name'] = $user['name'];
                 $_SESSION['role'] = $user['role'];
                 $_SESSION['email'] = $email;
+
                 session_regenerate_id(true);
 
                 if ($user['role'] === 'admin') {
@@ -81,12 +113,13 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                     header("Location: customer/dashboard.php");
                 }
                 exit();
+            } else {
+                $message = "Invalid password.";
+                $message_type = "error";
             }
 
-            $message = "Invalid password.";
-            $message_type = "error";
         } else {
-            $message = "No user found with that email.";
+            $message = "No user found.";
             $message_type = "error";
         }
 
@@ -94,12 +127,14 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     }
 }
 
-$page_title = "BazaarHub Auth";
-$signin_email = $auth_mode === 'signin' ? ($_POST['email'] ?? '') : '';
-$signup_name = $auth_mode === 'signup' ? ($_POST['full_name'] ?? '') : '';
-$signup_email = $auth_mode === 'signup' ? ($_POST['email'] ?? '') : '';
-$signup_role = $auth_mode === 'signup' ? ($_POST['role'] ?? 'customer') : 'customer';
+/* ===== RESET FORM VALUES (prevents UI auto-fill bug) ===== */
+$signin_email = "";
+$signup_name = "";
+$signup_email = "";
+$signup_role = "customer";
 ?>
+
+<?php $page_title = "BazaarHub - Sign In or Create Account"; ?>
 <!DOCTYPE html>
 <html lang="en">
 
@@ -315,4 +350,4 @@ $signup_role = $auth_mode === 'signup' ? ($_POST['role'] ?? 'customer') : 'custo
     <script src="assets/js/auth.js"></script>
 </body>
 
-</html>
+</html> 
