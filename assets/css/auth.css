@@ -555,7 +555,7 @@
         display: none;
     }
 
-    PLACEHOLDER_START {
+    .auth-card-shell {
         overflow-y: visible;
         min-height: auto;
     }
@@ -571,7 +571,7 @@
         border-radius: 1.5rem;
     }
 
-    PLACEHOLDER_START {
+    .auth-card-shell {
         padding: 1rem;
     }
 

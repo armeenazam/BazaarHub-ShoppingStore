@@ -36,6 +36,7 @@ body {
     background: var(--color-page);
     color: var(--color-text);
     font-family: var(--font-body);
+}
 
 button,
 input {
@@ -139,5 +140,4 @@ a {
         transition-duration: 0.01ms !important;
         scroll-behavior: auto !important;
     }
-}
 }

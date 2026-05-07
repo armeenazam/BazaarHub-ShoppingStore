@@ -1,9 +1,9 @@
 /* =========================================================
-   BAZARHUB DATABASE SCHEMA
-   Course: Database Systems
-   Stack: PHP + MySQL
+   BAZAARHUB DATABASE SCHEMA (FINAL MERGED)
    ========================================================= */
 
+CREATE DATABASE IF NOT EXISTS bazaarhub;
+USE bazaarhub;
 
 /* =========================================================
    1. USERS TABLE
@@ -14,21 +14,35 @@ CREATE TABLE users (
     email VARCHAR(100) UNIQUE NOT NULL,
     password VARCHAR(255) NOT NULL,
     role ENUM('admin','seller','customer') DEFAULT 'customer',
+    account_status ENUM('pending','active','suspended') DEFAULT 'active',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+/* =========================================================
+   2. USER ADDRESSES
+   ========================================================= */
+CREATE TABLE user_addresses (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT NOT NULL,
+    phone VARCHAR(30),
+    city VARCHAR(100),
+    address TEXT NOT NULL,
+    is_default BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id)
+    ON DELETE CASCADE ON UPDATE CASCADE
+);
 
 /* =========================================================
-   2. CATEGORIES TABLE
+   3. CATEGORIES
    ========================================================= */
 CREATE TABLE categories (
     id INT AUTO_INCREMENT PRIMARY KEY,
     name VARCHAR(100) UNIQUE NOT NULL
 );
 
-
 /* =========================================================
-   3. PRODUCTS TABLE
+   4. PRODUCTS
    ========================================================= */
 CREATE TABLE products (
     id INT AUTO_INCREMENT PRIMARY KEY,
@@ -39,56 +53,41 @@ CREATE TABLE products (
     category_id INT NOT NULL,
     seller_id INT NOT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-
-    FOREIGN KEY (category_id)
-        REFERENCES categories(id)
-        ON DELETE CASCADE
-        ON UPDATE CASCADE,
-
-    FOREIGN KEY (seller_id)
-        REFERENCES users(id)
-        ON DELETE CASCADE
-        ON UPDATE CASCADE
+    FOREIGN KEY (category_id) REFERENCES categories(id)
+    ON DELETE CASCADE ON UPDATE CASCADE,
+    FOREIGN KEY (seller_id) REFERENCES users(id)
+    ON DELETE CASCADE ON UPDATE CASCADE
 );
 
-
 /* =========================================================
-   4. CART TABLE
+   5. CART
    ========================================================= */
 CREATE TABLE cart (
     id INT AUTO_INCREMENT PRIMARY KEY,
     user_id INT NOT NULL,
     product_id INT NOT NULL,
     quantity INT NOT NULL,
-
-    FOREIGN KEY (user_id)
-        REFERENCES users(id)
-        ON DELETE CASCADE,
-
-    FOREIGN KEY (product_id)
-        REFERENCES products(id)
-        ON DELETE CASCADE
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE
 );
 
-
 /* =========================================================
-   5. ORDERS TABLE
+   6. ORDERS
    ========================================================= */
 CREATE TABLE orders (
     id INT AUTO_INCREMENT PRIMARY KEY,
     user_id INT NOT NULL,
+    delivery_address_id INT,
     total_amount DECIMAL(10,2) NOT NULL,
     status ENUM('pending','completed','cancelled') DEFAULT 'pending',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-
-    FOREIGN KEY (user_id)
-        REFERENCES users(id)
-        ON DELETE CASCADE
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (delivery_address_id) REFERENCES user_addresses(id)
+    ON DELETE SET NULL
 );
 
-
 /* =========================================================
-   6. ORDER ITEMS TABLE
+   7. ORDER ITEMS
    ========================================================= */
 CREATE TABLE order_items (
     id INT AUTO_INCREMENT PRIMARY KEY,
@@ -96,19 +95,12 @@ CREATE TABLE order_items (
     product_id INT NOT NULL,
     quantity INT NOT NULL,
     price DECIMAL(10,2) NOT NULL,
-
-    FOREIGN KEY (order_id)
-        REFERENCES orders(id)
-        ON DELETE CASCADE,
-
-    FOREIGN KEY (product_id)
-        REFERENCES products(id)
-        ON DELETE CASCADE
+    FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE,
+    FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE
 );
 
-
 /* =========================================================
-   7. REVIEWS TABLE
+   8. REVIEWS
    ========================================================= */
 CREATE TABLE reviews (
     id INT AUTO_INCREMENT PRIMARY KEY,
@@ -117,21 +109,13 @@ CREATE TABLE reviews (
     rating INT CHECK (rating BETWEEN 1 AND 5),
     comment TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-
     UNIQUE(user_id, product_id),
-
-    FOREIGN KEY (user_id)
-        REFERENCES users(id)
-        ON DELETE CASCADE,
-
-    FOREIGN KEY (product_id)
-        REFERENCES products(id)
-        ON DELETE CASCADE
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE
 );
 
-
 /* =========================================================
-   8. PAYMENTS TABLE
+   9. PAYMENTS
    ========================================================= */
 CREATE TABLE payments (
     id INT AUTO_INCREMENT PRIMARY KEY,
@@ -139,120 +123,126 @@ CREATE TABLE payments (
     amount DECIMAL(10,2) NOT NULL,
     payment_status ENUM('pending','paid') DEFAULT 'paid',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-
-    FOREIGN KEY (order_id)
-        REFERENCES orders(id)
-        ON DELETE CASCADE
+    FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE
 );
 
-
+/* =========================================================
+   10. INVOICES
+   ========================================================= */
+CREATE TABLE invoices (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    order_id INT UNIQUE NOT NULL,
+    invoice_number VARCHAR(50) UNIQUE NOT NULL,
+    subtotal DECIMAL(10,2) NOT NULL,
+    tax_amount DECIMAL(10,2) DEFAULT 0,
+    total_amount DECIMAL(10,2) NOT NULL,
+    issued_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE
+);
 
 /* =========================================================
-   SEED DATA SECTION
+   11. WISHLIST
+   ========================================================= */
+CREATE TABLE wishlist (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT NOT NULL,
+    product_id INT NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(user_id, product_id),
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE
+);
+
+/* =========================================================
+   SEED DATA
    ========================================================= */
 
-
-/* ---------------- USERS ---------------- */
+/* USERS */
 INSERT INTO users (name, email, password, role) VALUES
 ('Ali Raza', 'ali.raza@gmail.com', 'Ali@123', 'admin'),
 ('Sara Khan', 'sara.khan@gmail.com', 'Sara@123', 'admin'),
-
 ('Ahmed Hassan', 'ahmed.seller@gmail.com', 'Ahmed@123', 'seller'),
 ('Hina Malik', 'hina.seller@gmail.com', 'Hina@123', 'seller'),
+('Usman Tariq', 'usman@gmail.com', 'Usman@123', 'customer');
 
-('Usman Tariq', 'usman@gmail.com', 'Usman@123', 'customer'),
-('Ayesha Noor', 'ayesha@gmail.com', 'Ayesha@123', 'customer'),
-('Zain Ali', 'zain@gmail.com', 'Zain@123', 'customer'),
-('Fatima Khan', 'fatima@gmail.com', 'Fatima@123', 'customer'),
-('Hassan Raza', 'hassan@gmail.com', 'Hassan@123', 'customer'),
-('Laiba Ahmed', 'laiba@gmail.com', 'Laiba@123', 'customer');
-
-
-/* ---------------- CATEGORIES ---------------- */
+/* CATEGORIES */
 INSERT INTO categories (name) VALUES
-('Smartphones'),
-('Laptops'),
-('Fashion'),
-('Books'),
-('Home & Kitchen'),
-('Beauty'),
-('Sports'),
-('Toys'),
-('Automotive'),
-('Gaming');
+('Smartphones'),('Laptops'),('Fashion'),('Books'),('Home & Kitchen');
 
-
-/* ---------------- PRODUCTS ---------------- */
+/* PRODUCTS */
 INSERT INTO products (name, description, price, stock, category_id, seller_id) VALUES
 ('iPhone 14 Pro', 'Apple flagship smartphone', 280000, 8, 1, 3),
-('Samsung S23', 'Android flagship phone', 240000, 10, 1, 3),
+('Dell Laptop', 'Core i5 laptop', 185000, 6, 2, 4);
 
-('Dell Inspiron', 'Core i5 laptop for work', 185000, 6, 2, 4),
-('HP Pavilion Gaming', 'Gaming laptop RTX series', 320000, 4, 2, 4),
+/* =========================================================
+   VIEWS
+   ========================================================= */
 
-('Men Cotton Shirt', 'Comfortable summer wear', 2500, 40, 3, 3),
-('Women Lawn Suit', 'Stylish stitched outfit', 4500, 30, 3, 4),
+CREATE VIEW product_catalog_view AS
+SELECT p.id, p.name, p.price, c.name AS category_name
+FROM products p
+JOIN categories c ON c.id = p.category_id;
 
-('Physics Book FSC', 'Complete guide for exams', 1200, 50, 4, 3),
+CREATE VIEW seller_sales_view AS
+SELECT u.id, u.name, COUNT(o.id) AS total_orders
+FROM users u
+LEFT JOIN products p ON p.seller_id = u.id
+LEFT JOIN order_items oi ON oi.product_id = p.id
+LEFT JOIN orders o ON o.id = oi.order_id
+WHERE u.role = 'seller'
+GROUP BY u.id;
 
-('Non-stick Pan', 'Kitchen cooking essential', 3500, 25, 5, 4),
+/* =========================================================
+   FUNCTION
+   ========================================================= */
 
-('Lipstick Set', 'Matte beauty combo', 2800, 35, 6, 4),
+DELIMITER $$
 
-('Football', 'Professional match ball', 3200, 20, 7, 3);
+CREATE FUNCTION get_product_average_rating(productId INT)
+RETURNS DECIMAL(3,2)
+DETERMINISTIC
+BEGIN
+    DECLARE avgRating DECIMAL(3,2);
 
+    SELECT COALESCE(AVG(rating),0)
+    INTO avgRating
+    FROM reviews
+    WHERE product_id = productId;
 
-/* ---------------- CART ---------------- */
-INSERT INTO cart (user_id, product_id, quantity) VALUES
-(5, 1, 1),
-(6, 2, 1),
-(7, 3, 1),
-(8, 4, 1),
-(9, 5, 2),
-(10, 6, 1),
-(5, 7, 1),
-(6, 8, 1),
-(7, 9, 1),
-(8, 10, 1);
+    RETURN avgRating;
+END$$
 
+/* =========================================================
+   PROCEDURE
+   ========================================================= */
 
-/* ---------------- ORDERS ---------------- */
-INSERT INTO orders (user_id, total_amount, status) VALUES
-(5, 280000, 'completed'),
-(6, 240000, 'pending'),
-(7, 185000, 'completed'),
-(8, 320000, 'pending'),
-(9, 5000, 'completed'),
-(10, 3500, 'pending'),
-(5, 2800, 'completed'),
-(6, 4500, 'pending'),
-(7, 3200, 'completed'),
-(8, 1200, 'pending');
+CREATE PROCEDURE place_order_from_cart(IN customerId INT, IN addressId INT)
+BEGIN
+    DECLARE orderTotal DECIMAL(10,2);
+    DECLARE newOrderId INT;
 
+    START TRANSACTION;
 
-/* ---------------- ORDER ITEMS ---------------- */
-INSERT INTO order_items (order_id, product_id, quantity, price) VALUES
-(1, 1, 1, 280000),
-(2, 2, 1, 240000),
-(3, 3, 1, 185000),
-(4, 4, 1, 320000),
-(5, 5, 2, 2500),
-(6, 6, 1, 3500),
-(7, 9, 1, 2800),
-(8, 8, 1, 4500),
-(9, 10, 1, 3200),
-(10, 7, 1, 1200);
+    SELECT SUM(c.quantity * p.price)
+    INTO orderTotal
+    FROM cart c
+    JOIN products p ON p.id = c.product_id
+    WHERE c.user_id = customerId;
 
+    INSERT INTO orders (user_id, delivery_address_id, total_amount, status)
+    VALUES (customerId, addressId, orderTotal, 'completed');
 
-/* ---------------- REVIEWS ---------------- */
-INSERT INTO reviews (user_id, product_id, rating, comment) VALUES
-(5, 1, 5, 'Excellent phone performance'),
-(6, 2, 4, 'Very smooth Android experience'),
-(7, 3, 5, 'Perfect for office work'),
-(8, 4, 5, 'Great gaming performance'),
-(9, 5, 4, 'Good quality shirt'),
-(10, 6, 5, 'Very useful kitchen item'),
-(5, 7, 5, 'Nice lipstick shades'),
-(6, 8, 4, 'Good football quality'),
-(7, 9, 5, 'Helpful book for studies'),
-(8, 10, 4, 'Solid build mouse');
+    SET newOrderId = LAST_INSERT_ID();
+
+    INSERT INTO order_items (order_id, product_id, quantity, price)
+    SELECT newOrderId, c.product_id, c.quantity, p.price
+    FROM cart c
+    JOIN products p ON p.id = c.product_id
+    WHERE c.user_id = customerId;
+
+    DELETE FROM cart WHERE user_id = customerId;
+
+    COMMIT;
+END$$
+
+DELIMITER ;

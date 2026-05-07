@@ -1,4 +1,85 @@
-<?php $page_title = "BazaarHub - Sign In"; ?>
+<?php
+session_start();
+require_once 'db.php';
+
+$page_title = "BazaarHub - Sign In";
+$error = "";
+$success = "";
+$active_mode = "signin";
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $action = $_POST['action'] ?? '';
+
+    if ($action === 'signin') {
+        $email = trim($_POST['email'] ?? '');
+        $password = $_POST['password'] ?? '';
+
+        $stmt = mysqli_prepare($conn, "SELECT id, name, password, role FROM users WHERE email = ?");
+        mysqli_stmt_bind_param($stmt, "s", $email);
+        mysqli_stmt_execute($stmt);
+        $user = mysqli_fetch_assoc(mysqli_stmt_get_result($stmt));
+
+        if ($user && (password_verify($password, $user['password']) || $password === $user['password'])) {
+            $_SESSION['user_id'] = $user['id'];
+            $_SESSION['name'] = $user['name'];
+            $_SESSION['role'] = $user['role'];
+
+            if ($user['role'] === 'admin') {
+                header("Location: admin/dashboard.php");
+            } elseif ($user['role'] === 'seller') {
+                header("Location: seller/dashboard.php");
+            } else {
+                header("Location: customer/dashboard.php");
+            }
+            exit();
+        }
+
+        $error = "Invalid email or password.";
+    }
+
+    if ($action === 'signup') {
+        $active_mode = "signup";
+        $first_name = trim($_POST['first_name'] ?? '');
+        $last_name = trim($_POST['last_name'] ?? '');
+        $email = trim($_POST['email'] ?? '');
+        $password = $_POST['password'] ?? '';
+        $confirm_password = $_POST['confirm_password'] ?? '';
+        $phone = trim($_POST['phone'] ?? '');
+        $city = trim($_POST['city'] ?? '');
+        $address = trim($_POST['address'] ?? '');
+        $role = ($_POST['role'] ?? 'customer') === 'seller' ? 'seller' : 'customer';
+        $name = trim($first_name . ' ' . $last_name);
+
+        if ($name === '' || $email === '' || $password === '') {
+            $error = "Name, email, and password are required.";
+        } elseif ($password !== $confirm_password) {
+            $error = "Passwords do not match.";
+        } else {
+            $hashed_password = password_hash($password, PASSWORD_DEFAULT);
+            mysqli_begin_transaction($conn);
+            $stmt = mysqli_prepare($conn, "INSERT INTO users (name, email, password, role) VALUES (?, ?, ?, ?)");
+            mysqli_stmt_bind_param($stmt, "ssss", $name, $email, $hashed_password, $role);
+
+            if (mysqli_stmt_execute($stmt)) {
+                $new_user_id = mysqli_insert_id($conn);
+
+                if ($address !== '') {
+                    $stmt = mysqli_prepare($conn, "INSERT INTO user_addresses (user_id, phone, city, address, is_default) VALUES (?, ?, ?, ?, TRUE)");
+                    mysqli_stmt_bind_param($stmt, "isss", $new_user_id, $phone, $city, $address);
+                    mysqli_stmt_execute($stmt);
+                }
+
+                mysqli_commit($conn);
+                $success = "Account created. Please sign in.";
+                $active_mode = "signin";
+            } else {
+                mysqli_rollback($conn);
+                $error = "This email is already registered.";
+            }
+        }
+    }
+}
+?>
 <!DOCTYPE html>
 <html lang="en">
 
@@ -20,7 +101,7 @@
     <div class="page-glow page-glow--bottom" aria-hidden="true"></div>
 
     <main class="auth-main">
-        <section class="auth-card" data-auth-shell data-mode="signin" aria-label="BazaarHub authentication">
+        <section class="auth-card" data-auth-shell data-mode="<?= htmlspecialchars($active_mode) ?>" aria-label="BazaarHub authentication">
             <aside class="brand-panel">
                 <div class="brand-content">
                     <div class="brand-header">
@@ -60,7 +141,10 @@
                     </div>
 
                     <div class="auth-panel is-active" data-panel="signin" role="tabpanel" aria-labelledby="signin-tab">
-                        <form class="auth-form" data-mock-form="signin" novalidate>
+                        <?php if ($error): ?><p class="auth-message auth-message--error"><?= htmlspecialchars($error) ?></p><?php endif; ?>
+                        <?php if ($success): ?><p class="auth-message auth-message--success"><?= htmlspecialchars($success) ?></p><?php endif; ?>
+                        <form class="auth-form" method="POST">
+                            <input type="hidden" name="action" value="signin">
                             <div class="field">
                                 <div class="field__control">
                                     <span class="material-symbols-outlined field__icon">mail</span>
@@ -111,7 +195,8 @@
                     </div>
 
                     <div class="auth-panel" data-panel="signup" role="tabpanel" aria-labelledby="signup-tab" hidden>
-                        <form class="auth-form" data-mock-form="signup" novalidate>
+                        <form class="auth-form" method="POST">
+                            <input type="hidden" name="action" value="signup">
                             <div class="field-row">
                                 <div class="field">
                                     <div class="field__control">
@@ -189,7 +274,7 @@
                                 <p class="role-label">I want to:</p>
                                 <div class="role-options">
                                     <label class="role-option">
-                                        <input type="radio" name="role" value="buyer" checked>
+                                        <input type="radio" name="role" value="customer" checked>
                                         <span class="role-card">
                                             <span class="material-symbols-outlined role-icon">shopping_bag</span>
                                             <span class="role-text">Register as Buyer</span>
