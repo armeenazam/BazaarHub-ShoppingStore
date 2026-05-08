@@ -14,12 +14,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $email = trim($_POST['email'] ?? '');
         $password = $_POST['password'] ?? '';
 
-        $stmt = mysqli_prepare($conn, "SELECT id, name, password, role FROM users WHERE email = ?");
+        $stmt = mysqli_prepare($conn, "SELECT id, name, password, role, account_status FROM users WHERE email = ?");
         mysqli_stmt_bind_param($stmt, "s", $email);
         mysqli_stmt_execute($stmt);
         $user = mysqli_fetch_assoc(mysqli_stmt_get_result($stmt));
 
-        if ($user && (password_verify($password, $user['password']) || $password === $user['password'])) {
+        if ($user && ($user['account_status'] ?? 'active') === 'suspended') {
+            $error = "This account is suspended. Please contact the admin.";
+        } elseif ($user && (password_verify($password, $user['password']) || $password === $user['password'])) {
             $_SESSION['user_id'] = $user['id'];
             $_SESSION['name'] = $user['name'];
             $_SESSION['role'] = $user['role'];
@@ -47,7 +49,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $phone = trim($_POST['phone'] ?? '');
         $city = trim($_POST['city'] ?? '');
         $address = trim($_POST['address'] ?? '');
-        $role = ($_POST['role'] ?? 'customer') === 'seller' ? 'seller' : 'customer';
+        $requested_role = $_POST['role'] ?? 'customer';
+        $role = in_array($requested_role, ['admin', 'seller', 'customer'], true) ? $requested_role : 'customer';
         $name = trim($first_name . ' ' . $last_name);
 
         if ($name === '' || $email === '' || $password === '') {
@@ -287,6 +290,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                             <span class="material-symbols-outlined role-icon">storefront</span>
                                             <span class="role-text">Register as Seller</span>
                                             <span class="role-desc">Sell products to thousands of buyers</span>
+                                        </span>
+                                    </label>
+                                    <label class="role-option">
+                                        <input type="radio" name="role" value="admin">
+                                        <span class="role-card">
+                                            <span class="material-symbols-outlined role-icon">admin_panel_settings</span>
+                                            <span class="role-text">Register as Admin</span>
+                                            <span class="role-desc">Manage users, products, orders, and reports</span>
                                         </span>
                                     </label>
                                 </div>

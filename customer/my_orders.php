@@ -9,7 +9,17 @@ if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'customer') {
 
 $user_id = (int) $_SESSION['user_id'];
 $stmt = mysqli_prepare($conn, "
-    SELECT o.id, o.total_amount, o.status, o.created_at,
+    UPDATE orders
+    SET status = 'delivered'
+    WHERE user_id = ?
+      AND status IN ('pending','completed')
+      AND created_at <= DATE_SUB(NOW(), INTERVAL 1 MINUTE)
+");
+mysqli_stmt_bind_param($stmt, "i", $user_id);
+mysqli_stmt_execute($stmt);
+
+$stmt = mysqli_prepare($conn, "
+    SELECT o.id, o.subtotal, o.delivery_fee, o.tax_amount, o.total_amount, o.status, o.payment_method, o.card_last4, o.created_at,
            p.payment_status, i.invoice_number
     FROM orders o
     LEFT JOIN payments p ON p.order_id = o.id
@@ -22,36 +32,72 @@ mysqli_stmt_execute($stmt);
 $orders = mysqli_stmt_get_result($stmt);
 ?>
 <!DOCTYPE html>
-<html>
-<head><title>My Orders - BazaarHub</title></head>
-<body>
-<h1>My Orders</h1>
-<p>
-    <a href="dashboard.php">Dashboard</a> |
-    <a href="products.php">Products</a> |
-    <a href="cart.php">Cart</a> |
-    <a href="reviews.php">Reviews</a> |
-    <a href="../logout.php">Logout</a>
-</p>
-<hr>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My Orders - BazaarHub</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="../assets/css/styles.css">
+    <link rel="stylesheet" href="../assets/css/customer.css">
+</head>
+<body class="customer-page">
+<main class="shop-shell">
+    <nav class="shop-nav" aria-label="Customer navigation">
+        <a class="shop-brand" href="dashboard.php">
+            <strong>BazaarHub</strong>
+            <span>Clothing marketplace</span>
+        </a>
+        <div class="shop-links">
+            <a class="shop-link" href="dashboard.php">Dashboard</a>
+            <a class="shop-link" href="products.php">Shop</a>
+            <a class="shop-link" href="cart.php">Cart</a>
+            <a class="shop-link" href="reviews.php">Reviews</a>
+            <a class="shop-link" href="../logout.php">Logout</a>
+        </div>
+    </nav>
 
-<?php if (isset($_GET['placed'])): ?>
-    <p><strong>Order placed successfully. Payment and invoice were created.</strong></p>
+    <section class="shop-hero">
+        <div class="shop-hero__copy">
+            <p class="shop-kicker">Order history</p>
+            <h1 class="shop-title">Track every BazaarHub fit.</h1>
+            <p class="shop-copy">See order status, payment records, invoice numbers, and the clothing pieces included in each checkout.</p>
+        </div>
+        <div class="shop-hero__media">
+            <img src="../assets/images/products/pink_buttondown_shirt.jfif" alt="Pink button-down shirt">
+        </div>
+    </section>
+
+    <?php if (isset($_GET['placed'])): ?>
+        <div class="notice">Order placed successfully. Payment and invoice were created.</div>
+    <?php endif; ?>
+
+    <section class="orders-stack">
+<?php if (mysqli_num_rows($orders) === 0): ?>
+    <div class="empty-state">No orders yet. <a href="products.php">Start shopping</a>.</div>
 <?php endif; ?>
 
 <?php while ($order = mysqli_fetch_assoc($orders)): ?>
-    <h3>
-        Order #<?= (int) $order['id'] ?>
-        <?php if ($order['invoice_number']): ?>
-            - Invoice <?= htmlspecialchars($order['invoice_number']) ?>
-        <?php endif; ?>
-    </h3>
-    <p>
-        Status: <?= htmlspecialchars($order['status']) ?> |
-        Payment: <?= htmlspecialchars($order['payment_status'] ?? 'pending') ?> |
-        Total: PKR <?= number_format($order['total_amount'], 2) ?> |
-        Date: <?= htmlspecialchars($order['created_at']) ?>
-    </p>
+    <article class="order-card">
+        <div class="order-card__head">
+            <div>
+                <p class="shop-kicker">Order #<?= (int) $order['id'] ?></p>
+                <h2><?= $order['invoice_number'] ? 'Invoice ' . htmlspecialchars($order['invoice_number']) : 'Invoice pending' ?></h2>
+            </div>
+            <strong>$<?= number_format($order['total_amount'], 2) ?></strong>
+        </div>
+        <p class="muted-copy">
+            Status: <?= htmlspecialchars($order['status']) ?> |
+            Payment: <?= htmlspecialchars($order['payment_method']) ?> / <?= htmlspecialchars($order['payment_status'] ?? 'pending') ?> |
+            Date: <?= htmlspecialchars($order['created_at']) ?>
+        </p>
+        <p class="muted-copy">
+            Subtotal $<?= number_format($order['subtotal'], 2) ?> |
+            Delivery $<?= number_format($order['delivery_fee'], 2) ?> |
+            Tax $<?= number_format($order['tax_amount'], 2) ?>
+        </p>
 
     <?php
     $order_id = (int) $order['id'];
@@ -62,15 +108,18 @@ $orders = mysqli_stmt_get_result($stmt);
         WHERE oi.order_id = $order_id
     ");
     ?>
-    <ul>
+    <ul class="order-items">
         <?php while ($item = mysqli_fetch_assoc($items)): ?>
             <li>
                 <?= htmlspecialchars($item['name']) ?> -
                 Qty <?= (int) $item['quantity'] ?> -
-                PKR <?= number_format($item['price'], 2) ?>
+                $<?= number_format($item['price'], 2) ?>
             </li>
         <?php endwhile; ?>
     </ul>
+    </article>
 <?php endwhile; ?>
+    </section>
+</main>
 </body>
 </html>

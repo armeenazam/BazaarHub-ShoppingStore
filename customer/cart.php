@@ -29,84 +29,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     if (isset($_POST['place_order'])) {
-        mysqli_begin_transaction($conn);
-
-        try {
-            $stmt = mysqli_prepare($conn, "
-                SELECT c.product_id, c.quantity, p.price, p.stock
-                FROM cart c
-                JOIN products p ON p.id = c.product_id
-                WHERE c.user_id = ?
-                FOR UPDATE
-            ");
-            mysqli_stmt_bind_param($stmt, "i", $user_id);
-            mysqli_stmt_execute($stmt);
-            $result = mysqli_stmt_get_result($stmt);
-
-            $items = [];
-            $total = 0;
-
-            while ($item = mysqli_fetch_assoc($result)) {
-                if ((int) $item['quantity'] > (int) $item['stock']) {
-                    throw new Exception("Not enough stock for one or more products.");
-                }
-                $items[] = $item;
-                $total += $item['quantity'] * $item['price'];
-            }
-
-            if (!$items) {
-                throw new Exception("Your cart is empty.");
-            }
-
-            $address_id = null;
-            $stmt = mysqli_prepare($conn, "SELECT id FROM user_addresses WHERE user_id = ? ORDER BY is_default DESC, id ASC LIMIT 1");
-            mysqli_stmt_bind_param($stmt, "i", $user_id);
-            mysqli_stmt_execute($stmt);
-            $address = mysqli_fetch_assoc(mysqli_stmt_get_result($stmt));
-            if ($address) {
-                $address_id = (int) $address['id'];
-            }
-
-            $stmt = mysqli_prepare($conn, "INSERT INTO orders (user_id, delivery_address_id, total_amount, status) VALUES (?, ?, ?, 'completed')");
-            mysqli_stmt_bind_param($stmt, "iid", $user_id, $address_id, $total);
-            mysqli_stmt_execute($stmt);
-            $order_id = mysqli_insert_id($conn);
-
-            foreach ($items as $item) {
-                $stmt = mysqli_prepare($conn, "INSERT INTO order_items (order_id, product_id, quantity, price) VALUES (?, ?, ?, ?)");
-                mysqli_stmt_bind_param($stmt, "iiid", $order_id, $item['product_id'], $item['quantity'], $item['price']);
-                mysqli_stmt_execute($stmt);
-
-                $stmt = mysqli_prepare($conn, "UPDATE products SET stock = stock - ? WHERE id = ?");
-                mysqli_stmt_bind_param($stmt, "ii", $item['quantity'], $item['product_id']);
-                mysqli_stmt_execute($stmt);
-            }
-
-            $stmt = mysqli_prepare($conn, "INSERT INTO payments (order_id, amount, payment_status) VALUES (?, ?, 'paid')");
-            mysqli_stmt_bind_param($stmt, "id", $order_id, $total);
-            mysqli_stmt_execute($stmt);
-
-            $invoice_number = 'INV-' . str_pad((string) $order_id, 4, '0', STR_PAD_LEFT);
-            $stmt = mysqli_prepare($conn, "INSERT INTO invoices (order_id, invoice_number, subtotal, tax_amount, total_amount) VALUES (?, ?, ?, 0, ?)");
-            mysqli_stmt_bind_param($stmt, "isdd", $order_id, $invoice_number, $total, $total);
-            mysqli_stmt_execute($stmt);
-
-            $stmt = mysqli_prepare($conn, "DELETE FROM cart WHERE user_id = ?");
-            mysqli_stmt_bind_param($stmt, "i", $user_id);
-            mysqli_stmt_execute($stmt);
-
-            mysqli_commit($conn);
-            header("Location: my_orders.php?placed=1");
-            exit();
-        } catch (Exception $e) {
-            mysqli_rollback($conn);
-            $message = $e->getMessage();
-        }
+        header("Location: checkout.php");
+        exit();
     }
 }
 
 $stmt = mysqli_prepare($conn, "
-    SELECT c.id, c.quantity, p.name, p.price, p.stock
+    SELECT c.id, c.quantity, p.name, p.price, p.stock, p.image_url
     FROM cart c
     JOIN products p ON p.id = c.product_id
     WHERE c.user_id = ?
@@ -118,59 +47,89 @@ $cart_items = mysqli_stmt_get_result($stmt);
 $total = 0;
 ?>
 <!DOCTYPE html>
-<html>
-<head><title>Cart - BazaarHub</title></head>
-<body>
-<h1>Your Cart</h1>
-<p>
-    <a href="dashboard.php">Dashboard</a> |
-    <a href="products.php">Products</a> |
-    <a href="my_orders.php">Orders</a> |
-    <a href="../logout.php">Logout</a>
-</p>
-<hr>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cart - BazaarHub</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="../assets/css/styles.css">
+    <link rel="stylesheet" href="../assets/css/customer.css">
+</head>
+<body class="customer-page">
+<main class="shop-shell">
+    <nav class="shop-nav" aria-label="Customer navigation">
+        <a class="shop-brand" href="dashboard.php">
+            <strong>BazaarHub</strong>
+            <span>Clothing marketplace</span>
+        </a>
+        <div class="shop-links">
+            <a class="shop-link" href="dashboard.php">Dashboard</a>
+            <a class="shop-link" href="products.php">Shop</a>
+            <a class="shop-link" href="my_orders.php">Orders</a>
+            <a class="shop-link" href="../logout.php">Logout</a>
+        </div>
+    </nav>
 
-<?php if ($message): ?><p><strong><?= htmlspecialchars($message) ?></strong></p><?php endif; ?>
+    <section class="shop-hero">
+        <div class="shop-hero__copy">
+            <p class="shop-kicker">Checkout bag</p>
+            <h1 class="shop-title">Your cart is almost runway-ready.</h1>
+            <p class="shop-copy">Review quantities, remove pieces you changed your mind about, and place the order when the outfit feels right.</p>
+        </div>
+        <div class="shop-hero__media">
+            <img src="../assets/images/products/white_dress.jfif" alt="White dress product">
+        </div>
+    </section>
 
-<table border="1" cellpadding="8" cellspacing="0">
-    <tr>
-        <th>Product</th>
-        <th>Price (PKR)</th>
-        <th>Quantity</th>
-        <th>Subtotal</th>
-        <th>Action</th>
-    </tr>
-    <?php while ($item = mysqli_fetch_assoc($cart_items)): ?>
-        <?php $subtotal = $item['price'] * $item['quantity']; $total += $subtotal; ?>
-        <tr>
-            <td><?= htmlspecialchars($item['name']) ?></td>
-            <td><?= number_format($item['price'], 2) ?></td>
-            <td>
-                <form method="POST">
-                    <input type="hidden" name="cart_id" value="<?= $item['id'] ?>">
-                    <input type="number" name="quantity" value="<?= (int) $item['quantity'] ?>" min="1" max="<?= (int) $item['stock'] ?>">
-                    <button type="submit" name="update_cart">Update</button>
-                </form>
-            </td>
-            <td><?= number_format($subtotal, 2) ?></td>
-            <td>
-                <form method="POST">
-                    <input type="hidden" name="cart_id" value="<?= $item['id'] ?>">
-                    <button type="submit" name="remove_cart">Remove</button>
-                </form>
-            </td>
-        </tr>
-    <?php endwhile; ?>
-</table>
+    <?php if ($message): ?><div class="notice"><?= htmlspecialchars($message) ?></div><?php endif; ?>
 
-<h3>Total: PKR <?= number_format($total, 2) ?></h3>
+    <section class="shop-panel">
+        <div class="cart-list">
+            <?php while ($item = mysqli_fetch_assoc($cart_items)): ?>
+                <?php
+                    $subtotal = $item['price'] * $item['quantity'];
+                    $total += $subtotal;
+                    $image_src = '../' . ltrim($item['image_url'] ?: 'assets/images/products/blue_bow_blouse.jfif', '/');
+                ?>
+                <article class="cart-row">
+                    <img src="<?= htmlspecialchars($image_src) ?>" alt="<?= htmlspecialchars($item['name']) ?>">
+                    <div>
+                        <h2><?= htmlspecialchars($item['name']) ?></h2>
+                        <p>$<?= number_format($item['price'], 2) ?> each</p>
+                    </div>
+                    <form method="POST" class="cart-row__actions">
+                        <input type="hidden" name="cart_id" value="<?= $item['id'] ?>">
+                        <input class="quantity-input" type="number" name="quantity" value="<?= (int) $item['quantity'] ?>" min="1" max="<?= (int) $item['stock'] ?>">
+                        <button class="shop-button" type="submit" name="update_cart">Update</button>
+                    </form>
+                    <strong>$<?= number_format($subtotal, 2) ?></strong>
+                    <form method="POST">
+                        <input type="hidden" name="cart_id" value="<?= $item['id'] ?>">
+                        <button class="shop-button" type="submit" name="remove_cart">Remove</button>
+                    </form>
+                </article>
+            <?php endwhile; ?>
 
-<?php if ($total > 0): ?>
-    <form method="POST">
-        <button type="submit" name="place_order">Place Order</button>
-    </form>
-<?php else: ?>
-    <p>Your cart is empty. <a href="products.php">Browse products</a>.</p>
-<?php endif; ?>
+            <?php if ($total <= 0): ?>
+                <div class="empty-state">Your cart is empty. <a href="products.php">Browse products</a>.</div>
+            <?php endif; ?>
+        </div>
+    </section>
+
+    <section class="cart-summary">
+        <div>
+            <p class="shop-kicker">Order total</p>
+            <h2>$<?= number_format($total, 2) ?></h2>
+        </div>
+        <?php if ($total > 0): ?>
+            <form method="POST">
+                <button class="shop-button shop-button--primary" type="submit" name="place_order">Go to Checkout</button>
+            </form>
+        <?php endif; ?>
+    </section>
+</main>
 </body>
 </html>
