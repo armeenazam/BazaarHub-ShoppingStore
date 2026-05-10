@@ -113,10 +113,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
 
             $stmt = mysqli_prepare($conn, "
-                INSERT INTO orders (user_id, delivery_address_id, subtotal, delivery_fee, tax_amount, total_amount, status, payment_method, card_last4)
-                VALUES (?, ?, ?, ?, ?, ?, 'pending', ?, ?)
+                INSERT INTO orders (user_id, delivery_address_id, status)
+                VALUES (?, ?, 'pending')
             ");
-            mysqli_stmt_bind_param($stmt, "iiddddss", $user_id, $address_id, $locked_subtotal, $delivery_fee, $locked_tax, $locked_total, $payment_method, $card_last4);
+            mysqli_stmt_bind_param($stmt, "ii", $user_id, $address_id);
             mysqli_stmt_execute($stmt);
             $order_id = mysqli_insert_id($conn);
 
@@ -131,13 +131,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
 
             $payment_status = $payment_method === 'card' ? 'paid' : 'pending';
-            $stmt = mysqli_prepare($conn, "INSERT INTO payments (order_id, amount, payment_method, card_last4, payment_status) VALUES (?, ?, ?, ?, ?)");
-            mysqli_stmt_bind_param($stmt, "idsss", $order_id, $locked_total, $payment_method, $card_last4, $payment_status);
+            $stmt = mysqli_prepare($conn, "INSERT INTO payments (order_id, payment_method, card_last4, payment_status) VALUES (?, ?, ?, ?)");
+            mysqli_stmt_bind_param($stmt, "isss", $order_id, $payment_method, $card_last4, $payment_status);
             mysqli_stmt_execute($stmt);
 
             $invoice_number = 'INV-' . str_pad((string) $order_id, 4, '0', STR_PAD_LEFT);
-            $stmt = mysqli_prepare($conn, "INSERT INTO invoices (order_id, invoice_number, subtotal, tax_amount, total_amount) VALUES (?, ?, ?, ?, ?)");
-            mysqli_stmt_bind_param($stmt, "isddd", $order_id, $invoice_number, $locked_subtotal, $locked_tax, $locked_total);
+            $stmt = mysqli_prepare($conn, "INSERT INTO invoices (order_id, invoice_number) VALUES (?, ?)");
+            mysqli_stmt_bind_param($stmt, "is", $order_id, $invoice_number);
             mysqli_stmt_execute($stmt);
 
             $stmt = mysqli_prepare($conn, "DELETE FROM cart WHERE user_id = ?");

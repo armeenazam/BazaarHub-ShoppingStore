@@ -55,11 +55,12 @@ DROP VIEW IF EXISTS admin_sales_report_view;
 CREATE VIEW admin_sales_report_view AS
 SELECT DATE(o.created_at) AS order_date,
        COUNT(*) AS total_orders,
-       SUM(o.subtotal) AS subtotal,
-       SUM(o.delivery_fee) AS delivery_fees,
-       SUM(o.tax_amount) AS taxes,
-       SUM(o.total_amount) AS revenue
+       SUM(ot.subtotal) AS subtotal,
+       SUM(ot.delivery_fee) AS delivery_fees,
+       SUM(ot.tax_amount) AS taxes,
+       SUM(ot.total_amount) AS revenue
 FROM orders o
+JOIN order_totals_view ot ON ot.order_id = o.id
 WHERE o.status <> 'cancelled'
 GROUP BY DATE(o.created_at);
 
@@ -221,8 +222,8 @@ BEGIN
     SET taxAmount = ROUND(orderSubtotal * 0.05, 2);
     SET grandTotal = orderSubtotal + deliveryFee + taxAmount;
 
-    INSERT INTO orders (user_id, delivery_address_id, subtotal, delivery_fee, tax_amount, total_amount, status, payment_method, card_last4)
-    VALUES (customerId, addressId, orderSubtotal, deliveryFee, taxAmount, grandTotal, 'pending', payMethod, cardLast4Value);
+    INSERT INTO orders (user_id, delivery_address_id, status)
+    VALUES (customerId, addressId, 'pending');
 
     SET newOrderId = LAST_INSERT_ID();
 
@@ -237,11 +238,11 @@ BEGIN
     SET p.stock = p.stock - c.quantity
     WHERE c.user_id = customerId;
 
-    INSERT INTO payments (order_id, amount, payment_method, card_last4, payment_status)
-    VALUES (newOrderId, grandTotal, payMethod, cardLast4Value, IF(payMethod = 'card', 'paid', 'pending'));
+    INSERT INTO payments (order_id, payment_method, card_last4, payment_status)
+    VALUES (newOrderId, payMethod, cardLast4Value, IF(payMethod = 'card', 'paid', 'pending'));
 
-    INSERT INTO invoices (order_id, invoice_number, subtotal, tax_amount, total_amount)
-    VALUES (newOrderId, CONCAT('INV-', LPAD(newOrderId, 4, '0')), orderSubtotal, taxAmount, grandTotal);
+    INSERT INTO invoices (order_id, invoice_number)
+    VALUES (newOrderId, CONCAT('INV-', LPAD(newOrderId, 4, '0')));
 
     DELETE FROM cart WHERE user_id = customerId;
 

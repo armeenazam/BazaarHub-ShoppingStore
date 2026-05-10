@@ -75,7 +75,14 @@ mysqli_query($conn, "UPDATE orders SET status = 'delivered' WHERE status IN ('pe
 $users = mysqli_query($conn, "SELECT id, name, email, role, account_status, created_at FROM users ORDER BY created_at DESC");
 $categories = mysqli_query($conn, "SELECT c.id, c.name, COUNT(p.id) AS product_count FROM categories c LEFT JOIN products p ON p.category_id = c.id GROUP BY c.id, c.name ORDER BY c.name");
 $products = mysqli_query($conn, "SELECT p.id, p.name, p.price, p.stock, p.image_url, c.name AS category_name, u.name AS seller_name FROM products p JOIN categories c ON c.id = p.category_id JOIN users u ON u.id = p.seller_id ORDER BY p.created_at DESC");
-$orders = mysqli_query($conn, "SELECT o.*, u.name AS customer_name FROM orders o JOIN users u ON u.id = o.user_id ORDER BY o.created_at DESC");
+$orders = mysqli_query($conn, "
+    SELECT o.id, o.status, o.created_at, u.name AS customer_name,
+           COALESCE(ot.total_amount, 0) AS total_amount
+    FROM orders o
+    JOIN users u ON u.id = o.user_id
+    LEFT JOIN order_totals_view ot ON ot.order_id = o.id
+    ORDER BY o.created_at DESC
+");
 $reviews = mysqli_query($conn, "SELECT r.id, r.rating, r.comment, r.created_at, u.name AS customer_name, p.name AS product_name FROM reviews r JOIN users u ON u.id = r.user_id JOIN products p ON p.id = r.product_id ORDER BY r.created_at DESC");
 ?>
 <!DOCTYPE html>

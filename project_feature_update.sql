@@ -5,14 +5,16 @@ ALTER TABLE users
 
 ALTER TABLE orders
     MODIFY status ENUM('pending','completed','delivered','cancelled') DEFAULT 'pending',
-    ADD COLUMN IF NOT EXISTS subtotal DECIMAL(10,2) DEFAULT 0 AFTER delivery_address_id,
-    ADD COLUMN IF NOT EXISTS delivery_fee DECIMAL(10,2) DEFAULT 10.00 AFTER subtotal,
-    ADD COLUMN IF NOT EXISTS tax_amount DECIMAL(10,2) DEFAULT 0 AFTER delivery_fee,
-    ADD COLUMN IF NOT EXISTS payment_method ENUM('card','cash') DEFAULT 'cash' AFTER status,
-    ADD COLUMN IF NOT EXISTS card_last4 VARCHAR(4) NULL AFTER payment_method;
+    DROP COLUMN IF EXISTS subtotal,
+    DROP COLUMN IF EXISTS delivery_fee,
+    DROP COLUMN IF EXISTS tax_amount,
+    DROP COLUMN IF EXISTS total_amount,
+    DROP COLUMN IF EXISTS payment_method,
+    DROP COLUMN IF EXISTS card_last4;
 
 ALTER TABLE payments
-    ADD COLUMN IF NOT EXISTS payment_method ENUM('card','cash') DEFAULT 'cash' AFTER amount,
+    DROP COLUMN IF EXISTS amount,
+    ADD COLUMN IF NOT EXISTS payment_method ENUM('card','cash') DEFAULT 'cash' AFTER order_id,
     ADD COLUMN IF NOT EXISTS card_last4 VARCHAR(4) NULL AFTER payment_method;
 
 CREATE TABLE IF NOT EXISTS user_addresses (
@@ -31,9 +33,6 @@ CREATE TABLE IF NOT EXISTS invoices (
     id INT AUTO_INCREMENT PRIMARY KEY,
     order_id INT UNIQUE NOT NULL,
     invoice_number VARCHAR(50) UNIQUE NOT NULL,
-    subtotal DECIMAL(10,2) NOT NULL,
-    tax_amount DECIMAL(10,2) DEFAULT 0,
-    total_amount DECIMAL(10,2) NOT NULL,
     issued_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE
 );

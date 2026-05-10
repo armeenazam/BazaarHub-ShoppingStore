@@ -20,7 +20,8 @@ if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'seller') {
     <nav class="shop-nav">
         <a class="shop-brand" href="dashboard.php"><strong>BazaarHub</strong><span>Seller studio</span></a>
         <div class="shop-links">
-            <a class="shop-link" href="products.php">Products</a>
+            <a class="shop-link" href="manage-products.php">Manage Products</a>
+            <a class="shop-link" href="products.php">Store Catalog</a>
             <a class="shop-link" href="../logout.php">Logout</a>
         </div>
     </nav>
@@ -28,15 +29,15 @@ if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'seller') {
         <div class="shop-hero__copy">
             <p class="shop-kicker">Seller dashboard</p>
             <h1 class="shop-title">Welcome, <?= htmlspecialchars($_SESSION['name']); ?>.</h1>
-            <p class="shop-copy">Add clothing products with images, manage stock, update prices, and keep your catalog ready for customers.</p>
+            <p class="shop-copy">Manage your own products in one place, then open your read-only store catalog to preview the items shown to customers.</p>
         </div>
         <div class="shop-hero__media">
             <img src="../assets/images/products/blue_denim_mom_jeans.jpg" alt="Seller catalog">
         </div>
     </section>
     <section class="dashboard-grid">
-        <a class="dashboard-card" href="products.php"><span>01</span><h2>Manage Products</h2><p>Add, update, delete, price, describe, and upload product images.</p></a>
-        <a class="dashboard-card" href="products.php"><span>02</span><h2>View Seller Catalog</h2><p>Open your own product catalog and manage the storefront content customers will see.</p></a>
+        <a class="dashboard-card" href="manage-products.php"><span>01</span><h2>Manage Products</h2><p>Add, update, and delete your own product listings.</p></a>
+        <a class="dashboard-card" href="products.php"><span>02</span><h2>Store Catalog</h2><p>View the seller-only catalog exactly as customers would browse it.</p></a>
     </section>
 </main>
 </body>

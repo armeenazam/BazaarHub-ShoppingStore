@@ -11,10 +11,11 @@ mysqli_query($conn, "UPDATE orders SET status = 'delivered' WHERE status IN ('pe
 
 $summary = mysqli_fetch_assoc(mysqli_query($conn, "
     SELECT COUNT(*) AS total_orders,
-           COALESCE(SUM(total_amount), 0) AS revenue,
-           COALESCE(AVG(total_amount), 0) AS avg_order
-    FROM orders
-    WHERE status <> 'cancelled'
+           COALESCE(SUM(ot.total_amount), 0) AS revenue,
+           COALESCE(AVG(ot.total_amount), 0) AS avg_order
+    FROM orders o
+    JOIN order_totals_view ot ON ot.order_id = o.id
+    WHERE o.status <> 'cancelled'
 "));
 
 $top_products = mysqli_query($conn, "

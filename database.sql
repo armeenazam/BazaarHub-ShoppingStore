@@ -68,6 +68,8 @@ CREATE TABLE cart (
     user_id INT NOT NULL,
     product_id INT NOT NULL,
     quantity INT NOT NULL,
+    UNIQUE(user_id, product_id),
+    CHECK (quantity > 0),
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
     FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE
 );
@@ -79,13 +81,7 @@ CREATE TABLE orders (
     id INT AUTO_INCREMENT PRIMARY KEY,
     user_id INT NOT NULL,
     delivery_address_id INT,
-    subtotal DECIMAL(10,2) DEFAULT 0,
-    delivery_fee DECIMAL(10,2) DEFAULT 10.00,
-    tax_amount DECIMAL(10,2) DEFAULT 0,
-    total_amount DECIMAL(10,2) NOT NULL,
     status ENUM('pending','completed','delivered','cancelled') DEFAULT 'pending',
-    payment_method ENUM('card','cash') DEFAULT 'cash',
-    card_last4 VARCHAR(4) CHECK (card_last4 IS NULL OR CHAR_LENGTH(card_last4) = 4),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
     FOREIGN KEY (delivery_address_id) REFERENCES user_addresses(id)
@@ -101,6 +97,8 @@ CREATE TABLE order_items (
     product_id INT NOT NULL,
     quantity INT NOT NULL,
     price DECIMAL(10,2) NOT NULL,
+    UNIQUE(order_id, product_id),
+    CHECK (quantity > 0),
     FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE,
     FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE
 );
@@ -126,11 +124,11 @@ CREATE TABLE reviews (
 CREATE TABLE payments (
     id INT AUTO_INCREMENT PRIMARY KEY,
     order_id INT NOT NULL,
-    amount DECIMAL(10,2) NOT NULL,
     payment_method ENUM('card','cash') DEFAULT 'cash',
     card_last4 VARCHAR(4) CHECK (card_last4 IS NULL OR CHAR_LENGTH(card_last4) = 4),
     payment_status ENUM('pending','paid') DEFAULT 'paid',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(order_id),
     FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE
 );
 
@@ -141,12 +139,22 @@ CREATE TABLE invoices (
     id INT AUTO_INCREMENT PRIMARY KEY,
     order_id INT UNIQUE NOT NULL,
     invoice_number VARCHAR(50) UNIQUE NOT NULL,
-    subtotal DECIMAL(10,2) NOT NULL,
-    tax_amount DECIMAL(10,2) DEFAULT 0,
-    total_amount DECIMAL(10,2) NOT NULL,
     issued_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE
 );
+
+/* =========================================================
+   10B. ORDER TOTALS VIEW
+   ========================================================= */
+CREATE VIEW order_totals_view AS
+SELECT o.id AS order_id,
+       COALESCE(SUM(oi.quantity * oi.price), 0) AS subtotal,
+       10.00 AS delivery_fee,
+       ROUND(COALESCE(SUM(oi.quantity * oi.price), 0) * 0.05, 2) AS tax_amount,
+       ROUND(COALESCE(SUM(oi.quantity * oi.price), 0) + 10.00 + ROUND(COALESCE(SUM(oi.quantity * oi.price), 0) * 0.05, 2), 2) AS total_amount
+FROM orders o
+JOIN order_items oi ON oi.order_id = o.id
+GROUP BY o.id;
 
 /* =========================================================
    11. PASSWORD RESET TOKENS

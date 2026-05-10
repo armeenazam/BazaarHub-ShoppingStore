@@ -19,9 +19,19 @@ mysqli_stmt_bind_param($stmt, "i", $user_id);
 mysqli_stmt_execute($stmt);
 
 $stmt = mysqli_prepare($conn, "
-    SELECT o.id, o.subtotal, o.delivery_fee, o.tax_amount, o.total_amount, o.status, o.payment_method, o.card_last4, o.created_at,
-           p.payment_status, i.invoice_number
+    SELECT o.id,
+           COALESCE(ot.subtotal, 0) AS subtotal,
+           COALESCE(ot.delivery_fee, 10.00) AS delivery_fee,
+           COALESCE(ot.tax_amount, 0) AS tax_amount,
+           COALESCE(ot.total_amount, 0) AS total_amount,
+           o.status,
+           p.payment_method,
+           p.card_last4,
+           o.created_at,
+           p.payment_status,
+           i.invoice_number
     FROM orders o
+    LEFT JOIN order_totals_view ot ON ot.order_id = o.id
     LEFT JOIN payments p ON p.order_id = o.id
     LEFT JOIN invoices i ON i.order_id = o.id
     WHERE o.user_id = ?
