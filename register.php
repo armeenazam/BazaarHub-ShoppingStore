@@ -1,32 +1,59 @@
 <?php
 session_start();
 include 'db.php';
+require_once 'security.php';
 
 $error = "";
 $success = "";
 
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
+    csrf_validate_or_fail();
     $name     = trim($_POST['name']);
     $email    = trim($_POST['email']);
     $password = $_POST['password'];
-    $role     = in_array($_POST['role'], ['admin', 'seller', 'customer'], true) ? $_POST['role'] : 'customer';
+    $role     = in_array($_POST['role'] ?? 'customer', ['admin', 'seller', 'customer'], true) ? $_POST['role'] : 'customer';
+    $passwordErrors = validate_password_rules($password);
 
-    // Check if email already exists
-    $stmt = mysqli_prepare($conn, "SELECT id FROM users WHERE email = ?");
-    mysqli_stmt_bind_param($stmt, "s", $email);
-    mysqli_stmt_execute($stmt);
-    $check = mysqli_stmt_get_result($stmt);
-    if (mysqli_num_rows($check) > 0) {
-        $error = "Email already registered.";
+    if ($name === '' || $email === '' || $password === '') {
+        $error = "Name, email, and password are required.";
+    } elseif (!validate_email_address($email)) {
+        $error = "Please enter a valid email address.";
+    } elseif ($passwordErrors) {
+        $error = $passwordErrors[0];
     } else {
-        $hashed = password_hash($password, PASSWORD_DEFAULT);
-        $stmt = mysqli_prepare($conn, "INSERT INTO users (name, email, password, role) VALUES (?, ?, ?, ?)");
-        mysqli_stmt_bind_param($stmt, "ssss", $name, $email, $hashed, $role);
-        $insert = mysqli_stmt_execute($stmt);
-        if ($insert) {
-            $success = "Account created! <a href='login.php'>Login here</a>";
+        $stmt = mysqli_prepare($conn, "SELECT id FROM users WHERE email = ?");
+        mysqli_stmt_bind_param($stmt, "s", $email);
+        mysqli_stmt_execute($stmt);
+        $check = mysqli_stmt_get_result($stmt);
+
+        if (mysqli_num_rows($check) > 0) {
+            $error = "Email already registered.";
         } else {
-            $error = "Something went wrong. Try again.";
+            try {
+                $hashed = password_hash($password, PASSWORD_DEFAULT);
+                $stmt = mysqli_prepare($conn, "INSERT INTO users (name, email, password, role) VALUES (?, ?, ?, ?)");
+                mysqli_stmt_bind_param($stmt, "ssss", $name, $email, $hashed, $role);
+                mysqli_stmt_execute($stmt);
+
+                $new_user_id = mysqli_insert_id($conn);
+                session_regenerate_id(true);
+                $_SESSION['user_id'] = $new_user_id;
+                $_SESSION['name'] = $name;
+                $_SESSION['role'] = $role;
+
+                if ($role === 'admin') {
+                    header("Location: admin/dashboard.php");
+                } elseif ($role === 'seller') {
+                    header("Location: seller/dashboard.php");
+                } else {
+                    header("Location: customer/dashboard.php");
+                }
+                exit();
+            } catch (Throwable $e) {
+                $error = strpos($e->getMessage(), 'Duplicate entry') !== false
+                    ? "Email already registered."
+                    : "Something went wrong. Try again.";
+            }
         }
     }
 }
@@ -49,14 +76,15 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     <?php if($success): ?><p class="success"><?= $success ?></p><?php endif; ?>
 
     <form method="POST">
+        <?= csrf_input() ?>
         <label>Full Name</label>
-        <input type="text" name="name" required>
+        <input type="text" name="name" maxlength="100" required>
 
         <label>Email</label>
-        <input type="email" name="email" required>
+        <input type="email" name="email" maxlength="100" required>
 
         <label>Password</label>
-        <input type="password" name="password" required>
+        <input type="password" name="password" minlength="8" maxlength="255" required>
 
         <label>Register As</label>
         <select name="role">

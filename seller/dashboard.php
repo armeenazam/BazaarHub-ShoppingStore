@@ -36,7 +36,7 @@ if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'seller') {
     </section>
     <section class="dashboard-grid">
         <a class="dashboard-card" href="products.php"><span>01</span><h2>Manage Products</h2><p>Add, update, delete, price, describe, and upload product images.</p></a>
-        <a class="dashboard-card" href="../customer/products.php"><span>02</span><h2>View Storefront</h2><p>Preview the customer catalog with seller products inside it.</p></a>
+        <a class="dashboard-card" href="products.php"><span>02</span><h2>View Seller Catalog</h2><p>Open your own product catalog and manage the storefront content customers will see.</p></a>
     </section>
 </main>
 </body>

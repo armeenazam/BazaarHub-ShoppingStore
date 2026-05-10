@@ -1,6 +1,7 @@
 <?php
 session_start();
 require_once '../db.php';
+require_once '../security.php';
 
 if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'customer') {
     header("Location: ../login.php");
@@ -11,13 +12,30 @@ $user_id = (int) $_SESSION['user_id'];
 $message = "";
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    csrf_validate_or_fail();
     if (isset($_POST['update_cart'])) {
         $cart_id = (int) $_POST['cart_id'];
         $quantity = max(1, (int) $_POST['quantity']);
-        $stmt = mysqli_prepare($conn, "UPDATE cart SET quantity = ? WHERE id = ? AND user_id = ?");
-        mysqli_stmt_bind_param($stmt, "iii", $quantity, $cart_id, $user_id);
+        $stmt = mysqli_prepare($conn, "
+            SELECT c.id, c.product_id, p.stock
+            FROM cart c
+            JOIN products p ON p.id = c.product_id
+            WHERE c.id = ? AND c.user_id = ?
+        ");
+        mysqli_stmt_bind_param($stmt, "ii", $cart_id, $user_id);
         mysqli_stmt_execute($stmt);
-        $message = "Cart updated.";
+        $cart_item = mysqli_fetch_assoc(mysqli_stmt_get_result($stmt));
+
+        if (!$cart_item) {
+            $message = "Cart item not found.";
+        } elseif ($quantity > (int) $cart_item['stock']) {
+            $message = "Requested quantity is more than available stock.";
+        } else {
+            $stmt = mysqli_prepare($conn, "UPDATE cart SET quantity = ? WHERE id = ? AND user_id = ?");
+            mysqli_stmt_bind_param($stmt, "iii", $quantity, $cart_id, $user_id);
+            mysqli_stmt_execute($stmt);
+            $message = "Cart updated.";
+        }
     }
 
     if (isset($_POST['remove_cart'])) {
@@ -28,10 +46,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $message = "Item removed.";
     }
 
-    if (isset($_POST['place_order'])) {
-        header("Location: checkout.php");
-        exit();
-    }
 }
 
 $stmt = mysqli_prepare($conn, "
@@ -101,12 +115,14 @@ $total = 0;
                         <p>$<?= number_format($item['price'], 2) ?> each</p>
                     </div>
                     <form method="POST" class="cart-row__actions">
+                        <?= csrf_input() ?>
                         <input type="hidden" name="cart_id" value="<?= $item['id'] ?>">
                         <input class="quantity-input" type="number" name="quantity" value="<?= (int) $item['quantity'] ?>" min="1" max="<?= (int) $item['stock'] ?>">
                         <button class="shop-button" type="submit" name="update_cart">Update</button>
                     </form>
                     <strong>$<?= number_format($subtotal, 2) ?></strong>
                     <form method="POST">
+                        <?= csrf_input() ?>
                         <input type="hidden" name="cart_id" value="<?= $item['id'] ?>">
                         <button class="shop-button" type="submit" name="remove_cart">Remove</button>
                     </form>
@@ -125,9 +141,7 @@ $total = 0;
             <h2>$<?= number_format($total, 2) ?></h2>
         </div>
         <?php if ($total > 0): ?>
-            <form method="POST">
-                <button class="shop-button shop-button--primary" type="submit" name="place_order">Go to Checkout</button>
-            </form>
+            <a class="shop-button shop-button--primary" href="checkout.php">Go to Checkout</a>
         <?php endif; ?>
     </section>
 </main>

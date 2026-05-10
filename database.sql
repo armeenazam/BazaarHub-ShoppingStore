@@ -11,8 +11,8 @@ USE bazaarhub;
 CREATE TABLE users (
     id INT AUTO_INCREMENT PRIMARY KEY,
     name VARCHAR(100) NOT NULL,
-    email VARCHAR(100) UNIQUE NOT NULL,
-    password VARCHAR(255) NOT NULL,
+    email VARCHAR(100) UNIQUE NOT NULL CHECK (CHAR_LENGTH(email) BETWEEN 5 AND 100),
+    password VARCHAR(255) NOT NULL CHECK (CHAR_LENGTH(password) >= 8),
     role ENUM('admin','seller','customer') DEFAULT 'customer',
     account_status ENUM('pending','active','suspended') DEFAULT 'active',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -85,7 +85,7 @@ CREATE TABLE orders (
     total_amount DECIMAL(10,2) NOT NULL,
     status ENUM('pending','completed','delivered','cancelled') DEFAULT 'pending',
     payment_method ENUM('card','cash') DEFAULT 'cash',
-    card_last4 VARCHAR(4),
+    card_last4 VARCHAR(4) CHECK (card_last4 IS NULL OR CHAR_LENGTH(card_last4) = 4),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
     FOREIGN KEY (delivery_address_id) REFERENCES user_addresses(id)
@@ -128,7 +128,7 @@ CREATE TABLE payments (
     order_id INT NOT NULL,
     amount DECIMAL(10,2) NOT NULL,
     payment_method ENUM('card','cash') DEFAULT 'cash',
-    card_last4 VARCHAR(4),
+    card_last4 VARCHAR(4) CHECK (card_last4 IS NULL OR CHAR_LENGTH(card_last4) = 4),
     payment_status ENUM('pending','paid') DEFAULT 'paid',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE
@@ -149,7 +149,22 @@ CREATE TABLE invoices (
 );
 
 /* =========================================================
-   11. WISHLIST
+   11. PASSWORD RESET TOKENS
+   ========================================================= */
+CREATE TABLE password_reset_tokens (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT NOT NULL,
+    token_hash VARCHAR(255) NOT NULL,
+    expires_at DATETIME NOT NULL,
+    used_at DATETIME NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_password_reset_user (user_id),
+    INDEX idx_password_reset_hash (token_hash),
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+/* =========================================================
+   12. WISHLIST
    ========================================================= */
 CREATE TABLE wishlist (
     id INT AUTO_INCREMENT PRIMARY KEY,

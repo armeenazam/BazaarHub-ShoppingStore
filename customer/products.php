@@ -1,6 +1,7 @@
 <?php
 session_start();
 require_once '../db.php';
+require_once '../security.php';
 
 if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'customer') {
     header("Location: ../login.php");
@@ -11,6 +12,7 @@ $user_id = (int) $_SESSION['user_id'];
 $message = "";
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['product_id'])) {
+    csrf_validate_or_fail();
     $product_id = (int) $_POST['product_id'];
     $quantity = max(1, (int) ($_POST['quantity'] ?? 1));
 
@@ -21,24 +23,34 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['product_id'])) {
 
     if (!$product) {
         $message = "Product not found.";
-    } elseif ($quantity > (int) $product['stock']) {
-        $message = "Requested quantity is more than available stock.";
     } else {
-        $stmt = mysqli_prepare($conn, "SELECT id FROM cart WHERE user_id = ? AND product_id = ?");
+        $stmt = mysqli_prepare($conn, "
+            SELECT c.id, c.quantity AS existing_quantity, p.stock
+            FROM cart c
+            JOIN products p ON p.id = c.product_id
+            WHERE c.user_id = ? AND c.product_id = ?
+        ");
         mysqli_stmt_bind_param($stmt, "ii", $user_id, $product_id);
         mysqli_stmt_execute($stmt);
         $existing = mysqli_fetch_assoc(mysqli_stmt_get_result($stmt));
+        $existing_quantity = (int) ($existing['existing_quantity'] ?? 0);
+        $available_stock = (int) $product['stock'];
+        $requested_total = $existing_quantity + $quantity;
 
-        if ($existing) {
-            $stmt = mysqli_prepare($conn, "UPDATE cart SET quantity = quantity + ? WHERE id = ?");
-            mysqli_stmt_bind_param($stmt, "ii", $quantity, $existing['id']);
+        if ($requested_total > $available_stock) {
+            $message = "Requested quantity is more than available stock.";
+        } elseif ($existing) {
+            $stmt = mysqli_prepare($conn, "UPDATE cart SET quantity = ? WHERE id = ? AND user_id = ?");
+            mysqli_stmt_bind_param($stmt, "iii", $requested_total, $existing['id'], $user_id);
         } else {
             $stmt = mysqli_prepare($conn, "INSERT INTO cart (user_id, product_id, quantity) VALUES (?, ?, ?)");
             mysqli_stmt_bind_param($stmt, "iii", $user_id, $product_id, $quantity);
         }
 
-        mysqli_stmt_execute($stmt);
-        $message = "Product added to cart.";
+        if (!isset($message) || $message === "") {
+            mysqli_stmt_execute($stmt);
+            $message = "Product added to cart.";
+        }
     }
 }
 
@@ -153,6 +165,7 @@ $products = mysqli_stmt_get_result($stmt);
                         </div>
                         <?php if ((int) $product['stock'] > 0): ?>
                             <form class="cart-form" method="POST">
+                                <?= csrf_input() ?>
                                 <input type="hidden" name="product_id" value="<?= $product['id'] ?>">
                                 <input class="quantity-input" type="number" name="quantity" value="1" min="1" max="<?= (int) $product['stock'] ?>" aria-label="Quantity for <?= htmlspecialchars($product['name']) ?>">
                                 <button class="shop-button shop-button--primary" type="submit">Add to Cart</button>

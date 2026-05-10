@@ -1,6 +1,7 @@
 <?php
 session_start();
 require_once '../db.php';
+require_once '../security.php';
 
 if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'customer') {
     header("Location: ../login.php");
@@ -51,6 +52,7 @@ $address = $saved_address['address'] ?? '';
 $payment_method = 'cash';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    csrf_validate_or_fail();
     $phone = trim($_POST['phone'] ?? '');
     $city = trim($_POST['city'] ?? '');
     $address = trim($_POST['address'] ?? '');
@@ -60,7 +62,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if ($phone === '' || $city === '' || $address === '') {
         $message = "Please enter your complete delivery address.";
-    } elseif ($payment_method === 'card' && strlen($card_number) < 12) {
+    } elseif (!validate_phone_number($phone)) {
+        $message = "Please enter a valid phone number.";
+    } elseif ($payment_method === 'card' && !validate_card_number($card_number)) {
         $message = "Please enter a valid card number or choose cash.";
     } else {
         mysqli_begin_transaction($conn);
@@ -97,11 +101,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if ($saved_address) {
                 $address_id = (int) $saved_address['id'];
                 $stmt = mysqli_prepare($conn, "UPDATE user_addresses SET phone = ?, city = ?, address = ?, is_default = TRUE WHERE id = ? AND user_id = ?");
-                mysqli_stmt_bind_param($stmt, "sssii", $phone, $city, $address, $address_id, $user_id);
+                $normalized_phone = normalize_phone_number($phone);
+                mysqli_stmt_bind_param($stmt, "sssii", $normalized_phone, $city, $address, $address_id, $user_id);
                 mysqli_stmt_execute($stmt);
             } else {
                 $stmt = mysqli_prepare($conn, "INSERT INTO user_addresses (user_id, phone, city, address, is_default) VALUES (?, ?, ?, ?, TRUE)");
-                mysqli_stmt_bind_param($stmt, "isss", $user_id, $phone, $city, $address);
+                $normalized_phone = normalize_phone_number($phone);
+                mysqli_stmt_bind_param($stmt, "isss", $user_id, $normalized_phone, $city, $address);
                 mysqli_stmt_execute($stmt);
                 $address_id = mysqli_insert_id($conn);
             }
@@ -173,6 +179,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     <section class="checkout-layout">
         <form class="checkout-form shop-panel" method="POST">
+            <?= csrf_input() ?>
             <p class="shop-kicker">Delivery details</p>
             <h1 class="checkout-title">Confirm your order</h1>
             <?php if ($message): ?><div class="notice"><?= htmlspecialchars($message) ?></div><?php endif; ?>
@@ -181,7 +188,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 <input class="shop-input" value="<?= htmlspecialchars($customer_name) ?>" readonly>
             </label>
             <label>Phone
-                <input class="shop-input" name="phone" value="<?= htmlspecialchars($phone) ?>" required>
+                <input class="shop-input" name="phone" value="<?= htmlspecialchars($phone) ?>" inputmode="tel" maxlength="15" pattern="[0-9+\-\s()]{10,20}" required>
             </label>
             <label>City
                 <input class="shop-input" name="city" value="<?= htmlspecialchars($city) ?>" required>
@@ -196,7 +203,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 <label><input type="radio" name="payment_method" value="card" <?= $payment_method === 'card' ? 'checked' : '' ?>> Card payment</label>
             </div>
             <label>Card number
-                <input class="shop-input" name="card_number" placeholder="Only needed for card payment">
+                <input class="shop-input" name="card_number" inputmode="numeric" maxlength="19" pattern="[0-9\s\-]{13,23}" placeholder="Only needed for card payment">
             </label>
             <button class="shop-button shop-button--primary" type="submit">Confirm Order</button>
         </form>

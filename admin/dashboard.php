@@ -1,6 +1,7 @@
 <?php
 session_start();
 require_once '../db.php';
+require_once '../security.php';
 
 if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'admin') {
     header("Location: ../login.php");
@@ -10,57 +11,62 @@ if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'admin') {
 $message = "";
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    if (isset($_POST['update_user'])) {
-        $user_id = (int) $_POST['user_id'];
-        $status = in_array($_POST['account_status'], ['pending', 'active', 'suspended'], true) ? $_POST['account_status'] : 'active';
-        $role = in_array($_POST['role'], ['admin', 'seller', 'customer'], true) ? $_POST['role'] : 'customer';
-        $stmt = mysqli_prepare($conn, "UPDATE users SET role = ?, account_status = ? WHERE id = ?");
-        mysqli_stmt_bind_param($stmt, "ssi", $role, $status, $user_id);
-        mysqli_stmt_execute($stmt);
-        $message = "User updated.";
-    }
-
-    if (isset($_POST['add_category'])) {
-        $name = trim($_POST['category_name'] ?? '');
-        if ($name !== '') {
-            $stmt = mysqli_prepare($conn, "INSERT IGNORE INTO categories (name) VALUES (?)");
-            mysqli_stmt_bind_param($stmt, "s", $name);
+    csrf_validate_or_fail();
+    try {
+        if (isset($_POST['update_user'])) {
+            $user_id = (int) $_POST['user_id'];
+            $status = in_array($_POST['account_status'], ['pending', 'active', 'suspended'], true) ? $_POST['account_status'] : 'active';
+            $role = in_array($_POST['role'], ['admin', 'seller', 'customer'], true) ? $_POST['role'] : 'customer';
+            $stmt = mysqli_prepare($conn, "UPDATE users SET role = ?, account_status = ? WHERE id = ?");
+            mysqli_stmt_bind_param($stmt, "ssi", $role, $status, $user_id);
             mysqli_stmt_execute($stmt);
-            $message = "Category saved.";
+            $message = "User updated.";
         }
-    }
 
-    if (isset($_POST['delete_category'])) {
-        $category_id = (int) $_POST['category_id'];
-        $stmt = mysqli_prepare($conn, "DELETE FROM categories WHERE id = ?");
-        mysqli_stmt_bind_param($stmt, "i", $category_id);
-        mysqli_stmt_execute($stmt);
-        $message = "Category deleted if no products depended on it.";
-    }
+        if (isset($_POST['add_category'])) {
+            $name = trim($_POST['category_name'] ?? '');
+            if ($name !== '') {
+                $stmt = mysqli_prepare($conn, "INSERT IGNORE INTO categories (name) VALUES (?)");
+                mysqli_stmt_bind_param($stmt, "s", $name);
+                mysqli_stmt_execute($stmt);
+                $message = "Category saved.";
+            }
+        }
 
-    if (isset($_POST['delete_product'])) {
-        $product_id = (int) $_POST['product_id'];
-        $stmt = mysqli_prepare($conn, "DELETE FROM products WHERE id = ?");
-        mysqli_stmt_bind_param($stmt, "i", $product_id);
-        mysqli_stmt_execute($stmt);
-        $message = "Product deleted.";
-    }
+        if (isset($_POST['delete_category'])) {
+            $category_id = (int) $_POST['category_id'];
+            $stmt = mysqli_prepare($conn, "DELETE FROM categories WHERE id = ?");
+            mysqli_stmt_bind_param($stmt, "i", $category_id);
+            mysqli_stmt_execute($stmt);
+            $message = "Category deleted if no products depended on it.";
+        }
 
-    if (isset($_POST['update_order'])) {
-        $order_id = (int) $_POST['order_id'];
-        $status = in_array($_POST['status'], ['pending', 'completed', 'delivered', 'cancelled'], true) ? $_POST['status'] : 'pending';
-        $stmt = mysqli_prepare($conn, "UPDATE orders SET status = ? WHERE id = ?");
-        mysqli_stmt_bind_param($stmt, "si", $status, $order_id);
-        mysqli_stmt_execute($stmt);
-        $message = "Order updated.";
-    }
+        if (isset($_POST['delete_product'])) {
+            $product_id = (int) $_POST['product_id'];
+            $stmt = mysqli_prepare($conn, "DELETE FROM products WHERE id = ?");
+            mysqli_stmt_bind_param($stmt, "i", $product_id);
+            mysqli_stmt_execute($stmt);
+            $message = "Product deleted.";
+        }
 
-    if (isset($_POST['delete_review'])) {
-        $review_id = (int) $_POST['review_id'];
-        $stmt = mysqli_prepare($conn, "DELETE FROM reviews WHERE id = ?");
-        mysqli_stmt_bind_param($stmt, "i", $review_id);
-        mysqli_stmt_execute($stmt);
-        $message = "Review deleted.";
+        if (isset($_POST['update_order'])) {
+            $order_id = (int) $_POST['order_id'];
+            $status = in_array($_POST['status'], ['pending', 'completed', 'delivered', 'cancelled'], true) ? $_POST['status'] : 'pending';
+            $stmt = mysqli_prepare($conn, "UPDATE orders SET status = ? WHERE id = ?");
+            mysqli_stmt_bind_param($stmt, "si", $status, $order_id);
+            mysqli_stmt_execute($stmt);
+            $message = "Order updated.";
+        }
+
+        if (isset($_POST['delete_review'])) {
+            $review_id = (int) $_POST['review_id'];
+            $stmt = mysqli_prepare($conn, "DELETE FROM reviews WHERE id = ?");
+            mysqli_stmt_bind_param($stmt, "i", $review_id);
+            mysqli_stmt_execute($stmt);
+            $message = "Review deleted.";
+        }
+    } catch (Throwable $e) {
+        $message = "Unable to process that action right now.";
     }
 }
 
@@ -107,6 +113,7 @@ $reviews = mysqli_query($conn, "SELECT r.id, r.rating, r.comment, r.created_at, 
         <div class="admin-table">
             <?php while ($user = mysqli_fetch_assoc($users)): ?>
                 <form class="admin-row" method="POST">
+                    <?= csrf_input() ?>
                     <span><?= htmlspecialchars($user['name']) ?><small><?= htmlspecialchars($user['email']) ?></small></span>
                     <select class="shop-select" name="role">
                         <?php foreach (['admin', 'seller', 'customer'] as $role): ?>
@@ -128,12 +135,14 @@ $reviews = mysqli_query($conn, "SELECT r.id, r.rating, r.comment, r.created_at, 
     <section class="admin-section">
         <h2>Categories</h2>
         <form class="shop-toolbar" method="POST">
+            <?= csrf_input() ?>
             <input class="shop-input" name="category_name" placeholder="New category name">
             <button class="shop-button shop-button--primary" name="add_category">Add Category</button>
         </form>
         <div class="admin-table">
             <?php while ($category = mysqli_fetch_assoc($categories)): ?>
                 <form class="admin-row" method="POST">
+                    <?= csrf_input() ?>
                     <span><?= htmlspecialchars($category['name']) ?><small><?= (int) $category['product_count'] ?> products</small></span>
                     <input type="hidden" name="category_id" value="<?= $category['id'] ?>">
                     <button class="shop-button" name="delete_category">Delete</button>
@@ -147,6 +156,7 @@ $reviews = mysqli_query($conn, "SELECT r.id, r.rating, r.comment, r.created_at, 
         <div class="admin-table">
             <?php while ($product = mysqli_fetch_assoc($products)): ?>
                 <form class="admin-row" method="POST">
+                    <?= csrf_input() ?>
                     <span><?= htmlspecialchars($product['name']) ?><small><?= htmlspecialchars($product['seller_name']) ?> / <?= htmlspecialchars($product['category_name']) ?></small></span>
                     <strong>$<?= number_format($product['price'], 2) ?></strong>
                     <span><?= (int) $product['stock'] ?> stock</span>
@@ -162,6 +172,7 @@ $reviews = mysqli_query($conn, "SELECT r.id, r.rating, r.comment, r.created_at, 
         <div class="admin-table">
             <?php while ($order = mysqli_fetch_assoc($orders)): ?>
                 <form class="admin-row" method="POST">
+                    <?= csrf_input() ?>
                     <span>Order #<?= (int) $order['id'] ?><small><?= htmlspecialchars($order['customer_name']) ?> / $<?= number_format($order['total_amount'], 2) ?></small></span>
                     <select class="shop-select" name="status">
                         <?php foreach (['pending', 'completed', 'delivered', 'cancelled'] as $status): ?>
@@ -180,6 +191,7 @@ $reviews = mysqli_query($conn, "SELECT r.id, r.rating, r.comment, r.created_at, 
         <div class="admin-table">
             <?php while ($review = mysqli_fetch_assoc($reviews)): ?>
                 <form class="admin-row" method="POST">
+                    <?= csrf_input() ?>
                     <span><?= htmlspecialchars($review['product_name']) ?><small><?= (int) $review['rating'] ?>/5 by <?= htmlspecialchars($review['customer_name']) ?> - <?= htmlspecialchars($review['comment']) ?></small></span>
                     <input type="hidden" name="review_id" value="<?= $review['id'] ?>">
                     <button class="shop-button" name="delete_review">Delete</button>

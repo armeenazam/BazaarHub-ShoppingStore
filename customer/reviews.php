@@ -1,6 +1,7 @@
 <?php
 session_start();
 require_once '../db.php';
+require_once '../security.php';
 
 if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'customer') {
     header("Location: ../login.php");
@@ -21,6 +22,7 @@ mysqli_stmt_bind_param($stmt, "i", $user_id);
 mysqli_stmt_execute($stmt);
 
 if (isset($_POST['submit_review'])) {
+    csrf_validate_or_fail();
     $product_id = (int) $_POST['product_id'];
     $rating = max(1, min(5, (int) $_POST['rating']));
     $comment = trim($_POST['comment'] ?? '');
@@ -110,6 +112,7 @@ $completed_reviews = mysqli_stmt_get_result($stmt);
             <div class="empty-state">No delivered products are waiting for a review. This means your orders are not delivered yet, or you already reviewed every delivered product.</div>
         <?php else: ?>
             <form class="checkout-form" method="POST">
+                <?= csrf_input() ?>
                 <label>Product
                     <select class="shop-select" name="product_id" required>
                         <option value="">Select a delivered product</option>

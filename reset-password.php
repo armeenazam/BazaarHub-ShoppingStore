@@ -1,4 +1,122 @@
-<?php $page_title = "Reset Password | BazaarHub"; ?>
+<?php
+session_start();
+require_once 'db.php';
+require_once 'security.php';
+
+$page_title = "Reset Password | BazaarHub";
+$message = "";
+$linkValid = false;
+
+$email = trim($_GET['email'] ?? ($_POST['email'] ?? ''));
+$token = trim($_GET['token'] ?? ($_POST['token'] ?? ''));
+
+function find_valid_reset_token(mysqli $conn, string $token): ?array
+{
+    $stmt = mysqli_prepare($conn, "
+        SELECT id, user_id, token_hash, expires_at
+        FROM password_reset_tokens
+        WHERE used_at IS NULL
+        ORDER BY created_at DESC
+    ");
+    mysqli_stmt_execute($stmt);
+    $result = mysqli_stmt_get_result($stmt);
+
+    while ($row = mysqli_fetch_assoc($result)) {
+        if (strtotime($row['expires_at']) !== false && strtotime($row['expires_at']) > time() && password_verify($token, $row['token_hash'])) {
+            return $row;
+        }
+    }
+
+    return null;
+}
+
+$user = null;
+$resetRow = null;
+
+if ($_SERVER['REQUEST_METHOD'] === 'GET' && $token !== '') {
+    $resetRow = find_valid_reset_token($conn, $token);
+
+    if ($resetRow) {
+        if ($email !== '') {
+            $stmt = mysqli_prepare($conn, "SELECT id, email FROM users WHERE email = ?");
+            mysqli_stmt_bind_param($stmt, "s", $email);
+            mysqli_stmt_execute($stmt);
+            $user = mysqli_fetch_assoc(mysqli_stmt_get_result($stmt));
+        }
+
+        if (!$user || (int) $user['id'] !== (int) $resetRow['user_id']) {
+            $stmt = mysqli_prepare($conn, "SELECT id, email FROM users WHERE id = ?");
+            mysqli_stmt_bind_param($stmt, "i", $resetRow['user_id']);
+            mysqli_stmt_execute($stmt);
+            $user = mysqli_fetch_assoc(mysqli_stmt_get_result($stmt));
+        }
+
+        if ($user) {
+            $email = $user['email'];
+            $linkValid = true;
+        } else {
+            $message = "That reset link is invalid or expired.";
+        }
+    } else {
+        $message = "That reset link is invalid or expired.";
+    }
+} elseif ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $newPassword = $_POST['password'] ?? '';
+    $confirmPassword = $_POST['confirm_password'] ?? '';
+
+    if ($email === '' || $token === '') {
+        $message = "Your reset link is incomplete. Please request a new one.";
+    } elseif ($newPassword === '') {
+        $message = "Please choose a new password.";
+    } elseif ($newPassword !== $confirmPassword) {
+        $message = "Passwords do not match.";
+    } elseif ($passwordErrors = validate_password_rules($newPassword)) {
+        $message = $passwordErrors[0];
+    } else {
+        $resetRow = find_valid_reset_token($conn, $token);
+
+        if (!$resetRow) {
+            $message = "That reset link is invalid or expired.";
+        } else {
+            $stmt = mysqli_prepare($conn, "SELECT id, email FROM users WHERE id = ?");
+            mysqli_stmt_bind_param($stmt, "i", $resetRow['user_id']);
+            mysqli_stmt_execute($stmt);
+            $user = mysqli_fetch_assoc(mysqli_stmt_get_result($stmt));
+
+            if (!$user) {
+                $message = "That reset link is invalid or expired.";
+            } else {
+                $linkValid = true;
+                mysqli_begin_transaction($conn);
+                try {
+                    $hash = password_hash($newPassword, PASSWORD_DEFAULT);
+
+                    $stmt = mysqli_prepare($conn, "UPDATE users SET password = ? WHERE id = ?");
+                    mysqli_stmt_bind_param($stmt, "si", $hash, $user['id']);
+                    mysqli_stmt_execute($stmt);
+
+                    $stmt = mysqli_prepare($conn, "UPDATE password_reset_tokens SET used_at = NOW() WHERE id = ?");
+                    mysqli_stmt_bind_param($stmt, "i", $resetRow['id']);
+                    mysqli_stmt_execute($stmt);
+
+                    $stmt = mysqli_prepare($conn, "DELETE FROM password_reset_tokens WHERE user_id = ? AND id <> ?");
+                    mysqli_stmt_bind_param($stmt, "ii", $user['id'], $resetRow['id']);
+                    mysqli_stmt_execute($stmt);
+
+                    mysqli_commit($conn);
+                    $message = "Password updated. You can sign in with the new password now.";
+                    $email = '';
+                    $token = '';
+                    $linkValid = false;
+                } catch (Throwable $e) {
+                    mysqli_rollback($conn);
+                    $message = "Unable to reset the password right now.";
+                }
+            }
+        }
+    }
+}
+?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -21,9 +139,9 @@
                 <span>Bazaar</span><span class="wordmark__accent">Hub</span>
             </a>
             <nav class="site-nav" aria-label="Primary">
-                <a href="#">Discover</a>
-                <a href="#">Artisans</a>
-                <a href="#">Stories</a>
+                <a href="login.php">Sign in</a>
+                <a href="forgot-password.php">Forgot password</a>
+                <a href="customer/products.php">Shop</a>
             </nav>
         </div>
     </header>
@@ -36,31 +154,42 @@
                     <h1>Choose a fresh password</h1>
                     <p class="muted-copy">Use something strong, memorable, and unique to your BazaarHub account.</p>
 
-                    <form class="auth-form" data-mock-form="reset-password" novalidate>
-                        <div class="field">
-                            <label for="reset-password">New password</label>
-                            <div class="field__control field__control--password">
-                                <span class="field__icon" aria-hidden="true">
-                                    <svg viewBox="0 0 24 24"><path d="M17 9h-1V7a4 4 0 1 0-8 0v2H7a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-7a2 2 0 0 0-2-2zm-6 6.7V17a1 1 0 1 0 2 0v-1.3a2 2 0 1 0-2 0zM10 9V7a2 2 0 1 1 4 0v2h-4z"/></svg>
-                                </span>
-                                <input id="reset-password" name="password" type="password" placeholder="Create a new password" data-strength-source required>
-                                <button class="password-toggle" type="button" data-password-toggle aria-label="Show password">Show</button>
-                            </div>
-                        </div>
+                    <?php if ($message): ?>
+                        <div class="notice"><?= htmlspecialchars($message) ?></div>
+                    <?php endif; ?>
 
-                        <div class="field">
-                            <label for="confirm-reset-password">Confirm password</label>
-                            <div class="field__control field__control--password">
-                                <span class="field__icon" aria-hidden="true">
-                                    <svg viewBox="0 0 24 24"><path d="M17 9h-1V7a4 4 0 1 0-8 0v2H7a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-7a2 2 0 0 0-2-2zm-6 6.7V17a1 1 0 1 0 2 0v-1.3a2 2 0 1 0-2 0zM10 9V7a2 2 0 1 1 4 0v2h-4z"/></svg>
-                                </span>
-                                <input id="confirm-reset-password" name="confirm_password" type="password" placeholder="Confirm your new password" required>
-                                <button class="password-toggle" type="button" data-password-toggle aria-label="Show password">Show</button>
-                            </div>
-                        </div>
+                    <?php if ($linkValid): ?>
+                        <form class="auth-form" method="POST">
+                            <input type="hidden" name="email" value="<?= htmlspecialchars($email) ?>">
+                            <input type="hidden" name="token" value="<?= htmlspecialchars($token) ?>">
 
-                        <button class="submit-button" type="submit" data-loading-text="Resetting Password">Reset Password</button>
-                    </form>
+                            <div class="field">
+                                <label for="reset-password">New password</label>
+                                <div class="field__control field__control--password">
+                                    <span class="field__icon" aria-hidden="true">
+                                        <svg viewBox="0 0 24 24"><path d="M17 9h-1V7a4 4 0 1 0-8 0v2H7a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-7a2 2 0 0 0-2-2zm-6 6.7V17a1 1 0 1 0 2 0v-1.3a2 2 0 1 0-2 0zM10 9V7a2 2 0 1 1 4 0v2h-4z"/></svg>
+                                    </span>
+                                    <input id="reset-password" name="password" type="password" minlength="8" maxlength="255" placeholder="Create a new password" required>
+                                    <button class="password-toggle" type="button" data-password-toggle aria-label="Show password">Show</button>
+                                </div>
+                            </div>
+
+                            <div class="field">
+                                <label for="confirm-reset-password">Confirm password</label>
+                                <div class="field__control field__control--password">
+                                    <span class="field__icon" aria-hidden="true">
+                                        <svg viewBox="0 0 24 24"><path d="M17 9h-1V7a4 4 0 1 0-8 0v2H7a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-7a2 2 0 0 0-2-2zm-6 6.7V17a1 1 0 1 0 2 0v-1.3a2 2 0 1 0-2 0zM10 9V7a2 2 0 1 1 4 0v2h-4z"/></svg>
+                                    </span>
+                                    <input id="confirm-reset-password" name="confirm_password" type="password" minlength="8" maxlength="255" placeholder="Confirm your new password" required>
+                                    <button class="password-toggle" type="button" data-password-toggle aria-label="Show password">Show</button>
+                                </div>
+                            </div>
+
+                            <button class="submit-button" type="submit" data-loading-text="Resetting Password">Reset Password</button>
+                        </form>
+                    <?php else: ?>
+                        <p class="muted-copy">Use the reset link from the password recovery page to continue.</p>
+                    <?php endif; ?>
                 </div>
 
                 <aside class="strength-card" aria-label="Password strength guidance">

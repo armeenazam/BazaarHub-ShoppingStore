@@ -72,10 +72,18 @@ passwordToggles.forEach((toggle) => {
     });
 });
 
-/* ---------------- SOCIAL LOGIN MOCK ---------------- */
+/* ---------------- SOCIAL LOGIN ---------------- */
 socialButtons.forEach((button) => {
     button.addEventListener("click", () => {
-        showToast(button.dataset.social, "Social auth is mocked for now.");
+        const form = button.closest("form");
+        const authUrl = new URL(button.dataset.authUrl || "google-auth.php", window.location.href);
+        const selectedRole = form?.querySelector('input[name="role"]:checked')?.value;
+
+        if (selectedRole) {
+            authUrl.searchParams.set("role", selectedRole);
+        }
+
+        window.location.href = authUrl.toString();
     });
 });
 
