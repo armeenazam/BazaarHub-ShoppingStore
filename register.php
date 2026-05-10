@@ -12,14 +12,10 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     $email    = trim($_POST['email']);
     $password = $_POST['password'];
     $role     = in_array($_POST['role'] ?? 'customer', ['admin', 'seller', 'customer'], true) ? $_POST['role'] : 'customer';
-    $passwordErrors = validate_password_rules($password);
-
     if ($name === '' || $email === '' || $password === '') {
         $error = "Name, email, and password are required.";
     } elseif (!validate_email_address($email)) {
         $error = "Please enter a valid email address.";
-    } elseif ($passwordErrors) {
-        $error = $passwordErrors[0];
     } else {
         $stmt = mysqli_prepare($conn, "SELECT id FROM users WHERE email = ?");
         mysqli_stmt_bind_param($stmt, "s", $email);
@@ -84,7 +80,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         <input type="email" name="email" maxlength="100" required>
 
         <label>Password</label>
-        <input type="password" name="password" minlength="8" maxlength="255" required>
+        <input type="password" name="password" maxlength="255" required>
 
         <label>Register As</label>
         <select name="role">

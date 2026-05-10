@@ -82,16 +82,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $role = in_array($requested_role, ['admin', 'seller', 'customer'], true) ? $requested_role : 'customer';
         $name = trim($first_name . ' ' . $last_name);
 
-        $passwordErrors = validate_password_rules($password);
-
         if ($name === '' || $email === '' || $password === '') {
             $error = "Name, email, and password are required.";
         } elseif (!validate_email_address($email)) {
             $error = "Please enter a valid email address.";
         } elseif ($password !== $confirm_password) {
             $error = "Passwords do not match.";
-        } elseif ($passwordErrors) {
-            $error = $passwordErrors[0];
         } elseif ($phone !== '' && !validate_phone_number($phone)) {
             $error = "Please enter a valid phone number.";
         } else {
@@ -232,20 +228,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             </div>
 
                             <button class="submit-button" type="submit" data-loading-text="Signing In">Sign In</button>
-                            <div class="divider-row">
-                                <div class="divider"></div>
-                                <span>or</span>
-                                <div class="divider"></div>
-                            </div>
-                            <button class="google-button" type="button" data-social="Google" data-auth-url="google-auth.php?flow=signin" aria-label="Continue with Google">
-                                <svg viewBox="0 0 24 24" aria-hidden="true">
-                                    <path fill="#EA4335" d="M12 10.2v3.8h5.4c-.2 1.2-.9 2.3-1.9 3l3 2.4c1.7-1.6 2.7-4 2.7-6.8 0-.7-.1-1.3-.2-1.9H12z" />
-                                    <path fill="#34A853" d="M6.5 14.3l-.7.5-2.6 2c1.7 3.4 5.2 5.7 9.1 5.7 2.7 0 5-.9 6.7-2.4l-3.2-2.5c-.9.6-2.1 1-3.5 1-2.7 0-5-1.8-5.8-4.3z" />
-                                    <path fill="#FBBC05" d="M3.2 8.1c-.7 1.4-1.1 3-1.1 4.7s.4 3.3 1.1 4.7l3.3-2.6c-.2-.7-.3-1.3-.3-2.1s.1-1.5.3-2.1L3.2 8.1z" />
-                                    <path fill="#4285F4" d="M12 5.3c1.5 0 2.8.5 3.8 1.4l2.9-2.9C17.1 2.2 14.8 1.3 12 1.3 8.1 1.3 4.6 3.6 3 7l3.3 2.6c.8-2.5 3.1-4.3 5.7-4.3z" />
-                                </svg>
-                                <span>Continue with Google</span>
-                            </button>
                         </form>
                     </div>
 
@@ -278,7 +260,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             <div class="field">
                                 <div class="field__control field__control--password">
                                     <span class="material-symbols-outlined field__icon">lock</span>
-                                    <input id="signup-password" name="password" type="password" minlength="8" maxlength="255" placeholder="Create password" required>
+                                    <input id="signup-password" name="password" type="password" maxlength="255" placeholder="Create password" required>
                                     <button class="password-toggle" type="button" data-password-toggle aria-label="Show password">
                                         <svg class="eye-open" viewBox="0 0 24 24">
                                             <path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z" />
@@ -293,7 +275,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             <div class="field">
                                 <div class="field__control field__control--password">
                                     <span class="material-symbols-outlined field__icon">lock</span>
-                                    <input id="signup-confirm-password" name="confirm_password" type="password" minlength="8" maxlength="255" placeholder="Confirm password" required>
+                                    <input id="signup-confirm-password" name="confirm_password" type="password" maxlength="255" placeholder="Confirm password" required>
                                     <button class="password-toggle" type="button" data-password-toggle aria-label="Show password">
                                         <svg class="eye-open" viewBox="0 0 24 24">
                                             <path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z" />

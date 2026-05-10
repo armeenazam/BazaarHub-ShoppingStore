@@ -2,7 +2,6 @@ const authShell = document.querySelector("[data-auth-shell]");
 const tabs = document.querySelectorAll(".auth-tab");
 const panels = document.querySelectorAll("[data-panel]");
 const passwordToggles = document.querySelectorAll("[data-password-toggle]");
-const socialButtons = document.querySelectorAll("[data-social]");
 const forms = document.querySelectorAll("[data-mock-form]");
 const toastHost = document.querySelector(".toast-host");
 
@@ -69,21 +68,6 @@ passwordToggles.forEach((toggle) => {
             "aria-label",
             isVisible ? "Show password" : "Hide password"
         );
-    });
-});
-
-/* ---------------- SOCIAL LOGIN ---------------- */
-socialButtons.forEach((button) => {
-    button.addEventListener("click", () => {
-        const form = button.closest("form");
-        const authUrl = new URL(button.dataset.authUrl || "google-auth.php", window.location.href);
-        const selectedRole = form?.querySelector('input[name="role"]:checked')?.value;
-
-        if (selectedRole) {
-            authUrl.searchParams.set("role", selectedRole);
-        }
-
-        window.location.href = authUrl.toString();
     });
 });
 

@@ -23,12 +23,11 @@ Derived totals are produced through views such as `order_totals_view` instead of
 | `payments` | Yes | Yes | Yes | Yes | Stores payment method, status, and card tail for a single order. One payment row per order is enforced. |
 | `invoices` | Yes | Yes | Yes | Yes | Stores invoice identity only. Totals are derived from order items through views rather than duplicated in the table. |
 | `password_reset_tokens` | Yes | Yes | Yes | Yes | One token row represents one reset request. The token hash and expiry belong to the token record only. |
-| `wishlist` | Yes | Yes | Yes | Yes | One row per user-product combination. The unique constraint removes duplicate wishlist entries. |
 
 ## Why the Schema Is Normalized
 
 - No table stores repeated groups in a single row.
-- Many-to-many relationships are split into junction tables such as `order_items`, `cart`, `reviews`, and `wishlist`.
+- Many-to-many relationships are split into junction tables such as `order_items`, `cart`, and `reviews`.
 - Product category names and seller names are not duplicated inside `products`.
 - Customer address data is separated from the user account record.
 - Order financial totals are not copied across multiple tables; they are derived from `order_items` and exposed through `order_totals_view`.

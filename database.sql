@@ -12,7 +12,7 @@ CREATE TABLE users (
     id INT AUTO_INCREMENT PRIMARY KEY,
     name VARCHAR(100) NOT NULL,
     email VARCHAR(100) UNIQUE NOT NULL CHECK (CHAR_LENGTH(email) BETWEEN 5 AND 100),
-    password VARCHAR(255) NOT NULL CHECK (CHAR_LENGTH(password) >= 8),
+    password VARCHAR(255) NOT NULL,
     role ENUM('admin','seller','customer') DEFAULT 'customer',
     account_status ENUM('pending','active','suspended') DEFAULT 'active',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -169,19 +169,6 @@ CREATE TABLE password_reset_tokens (
     INDEX idx_password_reset_user (user_id),
     INDEX idx_password_reset_hash (token_hash),
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-);
-
-/* =========================================================
-   12. WISHLIST
-   ========================================================= */
-CREATE TABLE wishlist (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    user_id INT NOT NULL,
-    product_id INT NOT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE(user_id, product_id),
-    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
-    FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE
 );
 
 /* =========================================================
